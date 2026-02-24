@@ -1,1 +1,9 @@
-node_modules/\n.env\n.env.local\n.next/\ndist/\n.vercel
+node_modules/
+.env
+.env.local
+.next/
+dist/
+.vercel
+packages/core/node_modules/
+apps/web/node_modules/
+*.tsbuildinfo
