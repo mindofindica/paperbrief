@@ -19,13 +19,6 @@ import {
 } from '@paperbrief/core';
 import { Resend } from 'resend';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
-
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Verify cron secret
   const authHeader = req.headers.get('authorization');
@@ -34,6 +27,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { userId } = (await req.json()) as { userId?: string };
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const resendKey = process.env.RESEND_API_KEY;
+
+  if (!supabaseUrl || !supabaseKey || !resendKey) {
+    return NextResponse.json({ error: 'Missing server configuration' }, { status: 500 });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const resend = new Resend(resendKey);
 
   try {
     // Fetch all active tracks (for a user, or all users)
@@ -65,8 +69,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const userDigests = new Map<string, ReturnType<typeof buildDigest>>();
 
     for (const track of tracks) {
-      const filtered = prefilterPapers(papers, track.keywords);
-      const scored = await scorePapers(llmConfig, track, filtered, { concurrency: 2 });
+      const normalizedTrack = {
+        id: track.id,
+        name: track.name,
+        keywords: track.keywords,
+        arxivCats: track.arxiv_cats ?? [],
+        minScore: track.min_score ?? 0,
+      };
+
+      const filtered = prefilterPapers(papers, normalizedTrack.keywords);
+      const scored = await scorePapers(llmConfig, normalizedTrack, filtered, { concurrency: 2 });
 
       // Accumulate into per-user digest
       const existing = userDigests.get(track.user_id);

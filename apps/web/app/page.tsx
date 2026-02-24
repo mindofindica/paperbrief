@@ -3,6 +3,8 @@
  * Copy source: ../../../LANDING-COPY.md
  */
 
+import WaitlistForm from "./components/WaitlistForm";
+
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-white">
@@ -11,13 +13,9 @@ export default function LandingPage() {
         <span className="font-bold text-xl text-gray-900">📄 PaperBrief</span>
         <div className="flex items-center gap-4">
           <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</a>
-          <a href="/login" className="text-sm text-gray-600 hover:text-gray-900">Log in</a>
-          <a
-            href="/signup"
-            className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-          >
-            Get free digest →
-          </a>
+          <div className="hidden md:block w-[320px]">
+            <WaitlistForm compact buttonText="Join waitlist" />
+          </div>
         </div>
       </nav>
 
@@ -33,17 +31,11 @@ export default function LandingPage() {
           that actually matter to your work — ranked by relevance, summarised 
           in plain English.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <a
-            href="/signup"
-            className="bg-gray-900 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-gray-700"
-          >
-            Get your free digest →
-          </a>
-          <span className="text-gray-500 text-sm self-center">
-            No credit card. 2 minutes to set up.
-          </span>
-        </div>
+        <WaitlistForm
+          className="max-w-xl mx-auto"
+          buttonText="Join the waitlist"
+          note="No credit card. 2 minutes to set up."
+        />
       </section>
 
       {/* ── Problem ── */}
@@ -125,9 +117,7 @@ export default function LandingPage() {
                 <li>✓ Top 10 papers per week</li>
                 <li>✓ Forever free</li>
               </ul>
-              <a href="/signup" className="block text-center border border-gray-900 text-gray-900 px-6 py-2.5 rounded-lg hover:bg-gray-50">
-                Start free →
-              </a>
+              <WaitlistForm compact buttonText="Join waitlist" />
             </div>
             {/* Pro */}
             <div className="bg-gray-900 text-white rounded-xl p-8">
@@ -142,9 +132,7 @@ export default function LandingPage() {
                 <li>✓ Paper chat</li>
                 <li>✓ Reading list + export</li>
               </ul>
-              <a href="/signup?plan=pro" className="block text-center bg-white text-gray-900 px-6 py-2.5 rounded-lg hover:bg-gray-100 font-medium">
-                Start 14-day free trial →
-              </a>
+              <WaitlistForm compact buttonText="Join waitlist" />
             </div>
           </div>
         </div>
