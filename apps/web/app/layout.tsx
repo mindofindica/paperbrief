@@ -1,6 +1,15 @@
+import "./globals.css";
+
 export const metadata = {
-  title: "PaperBrief",
-  description: "Your personal ML research digest, powered by AI",
+  title: "PaperBrief — Your personal ML research digest",
+  description:
+    "PaperBrief reads 500+ ML papers a day so you don't have to. Enter your research interests, get a weekly digest of the papers that actually matter — ranked by relevance, summarised in plain English.",
+  openGraph: {
+    title: "PaperBrief — Stop drowning in arxiv",
+    description:
+      "Your personal research radar. Weekly digest of the ML papers that matter to your work.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
