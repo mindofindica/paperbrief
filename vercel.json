@@ -2,5 +2,15 @@
   "framework": "nextjs",
   "buildCommand": "npm run build --workspace=packages/core && npm run build --workspace=apps/web",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/digest",
+      "schedule": "0 20 * * 0"
+    },
+    {
+      "path": "/api/health",
+      "schedule": "0 9 * * 0"
+    }
+  ]
 }
