@@ -2,6 +2,13 @@
 
 > **Your personal ML research digest. Powered by AI, tuned to your topics.**
 
+[![Waitlist Mode](https://img.shields.io/badge/status-waitlist-blue)](https://paperbrief.vercel.app)
+[![Live](https://img.shields.io/badge/live-paperbrief.vercel.app-brightgreen)](https://paperbrief.vercel.app)
+
+🚀 **[paperbrief.vercel.app](https://paperbrief.vercel.app)** — Join the waitlist!
+
+---
+
 PaperBrief monitors arxiv every day, scores papers for relevance to your research interests, and delivers a clean weekly digest to your inbox — ranked by how much you'll actually care.
 
 ---
