@@ -3,9 +3,35 @@
  * Copy source: ../../../LANDING-COPY.md
  */
 
+import { createClient } from "@supabase/supabase-js";
 import WaitlistForm from "./components/WaitlistForm";
 
-export default function LandingPage() {
+export const revalidate = 3600; // ISR: revalidate waitlist count every hour
+
+async function getWaitlistCount(): Promise<number | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  try {
+    const supabase = createClient(url, key);
+    const { count } = await supabase
+      .from("paperbrief_waitlist")
+      .select("*", { count: "exact", head: true });
+    return count ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function LandingPage() {
+  const waitlistCount = await getWaitlistCount();
+
+  // Social proof text — only show when count > 0
+  const socialProof =
+    waitlistCount && waitlistCount > 0
+      ? `Join ${waitlistCount.toLocaleString()} researcher${waitlistCount === 1 ? "" : "s"} on the waitlist`
+      : null;
+
   return (
     <main className="min-h-screen bg-white">
       {/* ── Nav ── */}
@@ -26,15 +52,15 @@ export default function LandingPage() {
           Start reading what matters.
         </h1>
         <p className="text-xl text-gray-600 mb-10 max-w-xl mx-auto">
-          PaperBrief reads 500+ ML papers a day so you don't have to. 
-          Enter your research interests, get a weekly digest of the papers 
-          that actually matter to your work — ranked by relevance, summarised 
+          PaperBrief reads 500+ ML papers a day so you don't have to.{" "}
+          Enter your research interests, get a weekly digest of the papers{" "}
+          that actually matter to your work — ranked by relevance, summarised{" "}
           in plain English.
         </p>
         <WaitlistForm
           className="max-w-xl mx-auto"
           buttonText="Join the waitlist"
-          note="No credit card. 2 minutes to set up."
+          note={socialProof ?? "No credit card. 2 minutes to set up."}
         />
       </section>
 
@@ -46,8 +72,8 @@ export default function LandingPage() {
           </h2>
           <p className="text-gray-600 mb-6">
             There are 500+ new papers every single day in machine learning alone.
-            You can't read them all. But the ones you miss might be the ones that 
-            change your thesis direction, invalidate your approach, or give you the 
+            You can't read them all. But the ones you miss might be the ones that{" "}
+            change your thesis direction, invalidate your approach, or give you the{" "}
             exact technique you've been trying to invent yourself.
           </p>
           <p className="text-gray-600 mb-4">Right now, your options are:</p>
@@ -72,19 +98,19 @@ export default function LandingPage() {
           <div className="space-y-10">
             {[
               {
-                num: '1',
-                title: 'Tell us what you care about',
-                body: 'Add your research tracks: keywords, topics, arxiv categories. "Speculative decoding, LoRA fine-tuning, diffusion models for audio." Whatever you\'re actually working on.',
+                num: "1",
+                title: "Tell us what you care about",
+                body: "Add your research tracks: keywords, topics, arxiv categories. \"Speculative decoding, LoRA fine-tuning, diffusion models for audio.\" Whatever you're actually working on.",
               },
               {
-                num: '2',
-                title: 'We read everything',
-                body: 'Every day, PaperBrief pulls every new submission from arxiv and scores it against your tracks using an LLM — not keywords, not citation counts. Relevance to your work.',
+                num: "2",
+                title: "We read everything",
+                body: "Every day, PaperBrief pulls every new submission from arxiv and scores it against your tracks using an LLM — not keywords, not citation counts. Relevance to your work.",
               },
               {
-                num: '3',
-                title: 'You get the good stuff',
-                body: 'Once a week (or daily), your inbox gets a clean digest: top papers, ranked by score, with a 3-sentence summary of why this one matters for your research specifically.',
+                num: "3",
+                title: "You get the good stuff",
+                body: "Once a week (or daily), your inbox gets a clean digest: top papers, ranked by score, with a 3-sentence summary of why this one matters for your research specifically.",
               },
             ].map((step) => (
               <div key={step.num} className="flex gap-6">
@@ -138,13 +164,30 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── CTA Banner ── */}
+      <section className="py-20 px-6 text-center">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            Ready to stop missing important papers?
+          </h2>
+          <p className="text-gray-600 mb-8">
+            Join the waitlist. We'll let you know when PaperBrief opens.
+          </p>
+          <WaitlistForm
+            className="max-w-md mx-auto"
+            buttonText="Get early access"
+            note={socialProof ?? "Free tier available. No credit card needed."}
+          />
+        </div>
+      </section>
+
       {/* ── Footer ── */}
       <footer className="py-12 px-6 text-center text-gray-500 text-sm border-t border-gray-100">
         <p className="mb-2">
-          <a href="https://paperbrief.io" className="hover:text-gray-900">PaperBrief</a>
-          {' · '}
+          <a href="https://paperbrief.vercel.app" className="hover:text-gray-900">PaperBrief</a>
+          {" · "}
           <a href="/privacy" className="hover:text-gray-900">Privacy</a>
-          {' · '}
+          {" · "}
           <a href="/terms" className="hover:text-gray-900">Terms</a>
         </p>
         <p className="text-gray-400">Built by a researcher, for researchers. Powered by arxiv + Claude.</p>
