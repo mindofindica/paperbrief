@@ -8,6 +8,9 @@ const LEVEL_PROMPTS: Record<string, string> = {
   tldr: 'Give a 1-2 sentence TL;DR of this paper. Be concise and accessible.',
   medium: 'Explain this paper in 3-4 paragraphs for a technical audience. Cover the key contribution, method, and results.',
   deep: 'Give a detailed explanation of this paper covering: motivation, methodology, key results, limitations, and implications. Use 5-8 paragraphs.',
+  eli14: 'Explain this research paper to a curious 14-year-old with no technical background. Use simple analogies and everyday language. Avoid jargon. 2-3 short paragraphs.',
+  undergrad: 'Explain this paper to an undergraduate computer science student who knows the basics of machine learning but hasn\'t specialised yet. Cover what problem it solves, how it solves it, and why the result matters. 3-4 paragraphs.',
+  engineer: 'Explain this paper to a practising ML engineer. Be precise and technical. Cover: the core problem, the proposed approach and key design decisions, experimental results and benchmarks, practical implications, and any notable limitations. 4-6 paragraphs.',
 };
 
 export async function GET(
@@ -52,7 +55,7 @@ export async function GET(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-3-haiku',
+      model: 'anthropic/claude-sonnet-4-5',
       messages: [
         {
           role: 'user',

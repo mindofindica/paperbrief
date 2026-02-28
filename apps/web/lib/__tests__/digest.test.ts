@@ -1,29 +1,47 @@
-import { describe, it, expect, afterAll, beforeAll } from 'vitest';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Paper } from '../arxiv-db';
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'paperbrief-test-'));
-const dbPath = path.join(tmpDir, 'test.db');
-process.env.ARXIV_COACH_DB_PATH = dbPath;
+// Mock the arxiv-db module entirely — no real DB needed
+vi.mock('../arxiv-db', () => ({
+  getTodaysPapers: vi.fn(),
+  getPaper: vi.fn(),
+  getReadingList: vi.fn(),
+  writeFeedback: vi.fn(),
+  updateReadingList: vi.fn(),
+  getRawDb: vi.fn(),
+  closeDb: vi.fn(),
+}));
 
-import { getTodaysPapers, getRawDb, closeDb } from '../arxiv-db';
+import { getTodaysPapers } from '../arxiv-db';
 
-beforeAll(() => {
-  const db = getRawDb(); // creates tables via ensureTables
-  const today = new Date().toISOString().slice(0, 10);
-  db.prepare(`INSERT OR REPLACE INTO papers (arxiv_id, title, abstract, published_date, llm_score, track) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run('2602.12345', 'Test Paper One', 'Abstract of test paper', today, 4.5, 'cs.AI');
-  db.prepare(`INSERT OR REPLACE INTO papers (arxiv_id, title, abstract, published_date, llm_score, track) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run('2602.12346', 'Test Paper Two', 'Another abstract', today, 3.0, 'cs.LG');
-});
-
-afterAll(() => {
-  closeDb();
-  fs.rmSync(tmpDir, { recursive: true });
-});
+const mockPapers: Paper[] = [
+  {
+    arxiv_id: '2602.12345',
+    title: 'Test Paper One',
+    abstract: 'Abstract of test paper',
+    published_at: '2026-02-28T00:00:00Z',
+    llm_score: 4.5,
+    track: 'Agents / Memory',
+    authors: '["Alice Smith","Bob Jones"]',
+    url: 'https://arxiv.org/abs/2602.12345',
+  },
+  {
+    arxiv_id: '2602.12346',
+    title: 'Test Paper Two',
+    abstract: 'Another abstract',
+    published_at: '2026-02-28T00:00:00Z',
+    llm_score: 3.0,
+    track: 'RAG & Grounding',
+    authors: '["Carol White"]',
+    url: 'https://arxiv.org/abs/2602.12346',
+  },
+];
 
 describe('getTodaysPapers', () => {
+  beforeEach(() => {
+    vi.mocked(getTodaysPapers).mockReturnValue(mockPapers);
+  });
+
   it('returns papers with correct shape', () => {
     const papers = getTodaysPapers();
     expect(papers.length).toBe(2);
@@ -32,10 +50,23 @@ describe('getTodaysPapers', () => {
     expect(papers[0]).toHaveProperty('abstract');
     expect(papers[0]).toHaveProperty('llm_score');
     expect(papers[0]).toHaveProperty('track');
+    expect(papers[0]).toHaveProperty('published_at');
+    expect(papers[0]).toHaveProperty('url');
   });
 
   it('returns papers sorted by score descending', () => {
     const papers = getTodaysPapers();
     expect(papers[0].llm_score).toBeGreaterThanOrEqual(papers[1].llm_score!);
+  });
+
+  it('returns arxiv URL in correct format', () => {
+    const papers = getTodaysPapers();
+    expect(papers[0].url).toBe('https://arxiv.org/abs/2602.12345');
+  });
+
+  it('returns empty array when no papers available', () => {
+    vi.mocked(getTodaysPapers).mockReturnValue([]);
+    const papers = getTodaysPapers();
+    expect(papers).toEqual([]);
   });
 });

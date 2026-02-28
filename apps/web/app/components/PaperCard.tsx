@@ -32,6 +32,9 @@ const EXPLANATION_LEVELS = [
   { key: 'tldr', label: 'TL;DR' },
   { key: 'medium', label: 'Medium' },
   { key: 'deep', label: 'Deep' },
+  { key: 'eli14', label: 'ELI14 🧒' },
+  { key: 'undergrad', label: 'Undergrad 🎓' },
+  { key: 'engineer', label: 'ML Engineer ⚙️' },
 ];
 
 export default function PaperCard({ paper }: { paper: Paper }) {
