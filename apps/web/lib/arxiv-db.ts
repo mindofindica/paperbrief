@@ -1,0 +1,177 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+import { randomUUID } from 'crypto';
+
+let _db: Database.Database | null = null;
+
+function getDbPath(): string {
+  return process.env.ARXIV_COACH_DB_PATH || '/root/.openclaw/state/arxiv-coach/db.sqlite';
+}
+
+function getDb(): Database.Database {
+  if (!_db) {
+    _db = new Database(getDbPath(), { readonly: false });
+    _db.pragma('journal_mode = WAL');
+    _db.pragma('foreign_keys = ON');
+  }
+  return _db;
+}
+
+export interface Paper {
+  arxiv_id: string;
+  title: string;
+  abstract: string | null;
+  published_at: string | null;
+  llm_score: number | null;
+  track: string | null;
+  authors: string | null;
+  url: string | null;
+}
+
+export interface ReadingListEntry extends Paper {
+  status: string;
+  priority: number;
+  added_at: string | null;
+  notes: string | null;
+}
+
+// Map real schema → normalised Paper shape
+function rowToPaper(row: any): Paper {
+  return {
+    arxiv_id: row.arxiv_id,
+    title: row.title,
+    abstract: row.abstract ?? null,
+    published_at: row.published_at ?? null,
+    llm_score: row.relevance_score ?? null,
+    track: row.track ?? null,
+    authors: row.authors_json ?? null,
+    url: row.arxiv_id ? `https://arxiv.org/abs/${row.arxiv_id}` : null,
+  };
+}
+
+export function getTodaysPapers(): Paper[] {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Try to get papers from today's sent digest first
+  const digestExists = db.prepare(
+    `SELECT digest_date FROM sent_digests WHERE digest_date = ? LIMIT 1`
+  ).get(today) as any;
+
+  if (digestExists) {
+    const rows = db.prepare(`
+      SELECT p.*, ls.relevance_score, dp.track_name as track
+      FROM digest_papers dp
+      JOIN papers p ON dp.arxiv_id = p.arxiv_id
+      LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+      WHERE dp.digest_date = ?
+      ORDER BY ls.relevance_score DESC
+    `).all(today) as any[];
+    if (rows.length > 0) return rows.map(rowToPaper);
+  }
+
+  // Fallback: most recent 10 scored papers
+  const rows = db.prepare(`
+    SELECT p.*, ls.relevance_score,
+           (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track
+    FROM papers p
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+    ORDER BY p.published_at DESC, ls.relevance_score DESC
+    LIMIT 10
+  `).all() as any[];
+
+  return rows.map(rowToPaper);
+}
+
+export function getPaper(arxivId: string): Paper | undefined {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT p.*, ls.relevance_score,
+           (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track
+    FROM papers p
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE p.arxiv_id = ?
+  `).get(arxivId) as any;
+  return row ? rowToPaper(row) : undefined;
+}
+
+export function getReadingList(status?: string): ReadingListEntry[] {
+  const db = getDb();
+  const where = status && status !== 'all' ? `WHERE r.status = ?` : '';
+  const params = status && status !== 'all' ? [status] : [];
+
+  const rows = db.prepare(`
+    SELECT p.*, ls.relevance_score,
+           (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track,
+           r.status, r.priority, r.created_at as added_at, r.notes
+    FROM reading_list r
+    JOIN papers p ON r.paper_id = p.arxiv_id
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    ${where}
+    ORDER BY r.priority DESC, r.created_at DESC
+  `).all(...params) as any[];
+
+  return rows.map(row => ({
+    ...rowToPaper(row),
+    status: row.status,
+    priority: row.priority,
+    added_at: row.added_at ?? null,
+    notes: row.notes ?? null,
+  }));
+}
+
+export function writeFeedback(arxivId: string, action: string): void {
+  const db = getDb();
+  const id = randomUUID();
+  const now = new Date().toISOString();
+
+  // Upsert into paper_feedback
+  db.prepare(`
+    INSERT INTO paper_feedback (id, paper_id, feedback_type, created_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(paper_id, feedback_type) DO UPDATE SET created_at = excluded.created_at
+  `).run(id, arxivId, action, now);
+
+  // Manage reading_list
+  const rlId = randomUUID();
+  const statusMap: Record<string, string> = {
+    read: 'reading',
+    save: 'unread',
+    love: 'unread',
+    skip: 'done',
+    meh: 'done',
+  };
+  const newStatus = statusMap[action];
+  const priority = action === 'love' ? 8 : action === 'save' ? 5 : 0;
+
+  if (newStatus) {
+    db.prepare(`
+      INSERT INTO reading_list (id, paper_id, status, priority, created_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(paper_id) DO UPDATE SET status = excluded.status, priority = MAX(reading_list.priority, excluded.priority)
+    `).run(rlId, arxivId, newStatus, priority, now);
+  }
+}
+
+export function updateReadingList(arxivId: string, status: string, priority?: number): void {
+  const db = getDb();
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO reading_list (id, paper_id, status, priority, created_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(paper_id) DO UPDATE SET status = excluded.status, priority = excluded.priority
+  `).run(id, arxivId, status, priority ?? 0, now);
+}
+
+export function getRawDb(): Database.Database {
+  return getDb();
+}
+
+export function closeDb(): void {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+}
