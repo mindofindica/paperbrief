@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     pool: 'forks',
     include: ['lib/**/*.test.ts', 'lib/**/*.test.tsx'],
+    exclude: ['node_modules', '.next'],
     coverage: {
       reporter: ['text', 'lcov'],
       include: ['lib/**/*.ts', 'lib/**/*.tsx'],
