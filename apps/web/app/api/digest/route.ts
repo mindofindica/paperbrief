@@ -15,9 +15,8 @@ import {
   prefilterPapers,
   scorePapers,
   buildDigest,
-  renderDigestText,
 } from '@paperbrief/core';
-import { Resend } from 'resend';
+import { sendDigestEmail } from '../../../lib/email/send-digest';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Verify cron secret
@@ -30,14 +29,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const resendKey = process.env.RESEND_API_KEY;
 
-  if (!supabaseUrl || !supabaseKey || !resendKey) {
+  if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Missing server configuration' }, { status: 500 });
   }
 
+  // RESEND_API_KEY is optional here — sendDigestEmail will gracefully no-op if absent.
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const resend = new Resend(resendKey);
 
   try {
     // Fetch all active tracks (for a user, or all users)
@@ -111,14 +109,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const email = user?.user?.email;
       if (!email) continue;
 
-      const text = renderDigestText(digest);
-
-      await resend.emails.send({
-        from: 'PaperBrief <digest@paperbrief.io>',
-        to: email,
-        subject: `📄 Your PaperBrief digest — week of ${digest.weekOf}`,
-        text,
-      });
+      const sendResult = await sendDigestEmail({ to: email, digest });
+      if (!sendResult.ok && !('skipped' in sendResult && sendResult.skipped)) {
+        console.error('[digest] Failed to send email to', email, ':', sendResult.error);
+      }
 
       // Record delivery
       await supabase.from('deliveries').upsert({
