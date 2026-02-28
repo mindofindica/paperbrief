@@ -111,7 +111,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       const sendResult = await sendDigestEmail({ to: email, digest });
       if (!sendResult.ok && !('skipped' in sendResult && sendResult.skipped)) {
-        console.error('[digest] Failed to send email to', email, ':', sendResult.error);
+        console.error('[digest] Failed to send email to', email, ':', (sendResult as any).error);
       }
 
       // Record delivery

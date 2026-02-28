@@ -119,8 +119,8 @@ export function DigestEmail({
     <Html>
       <Head />
       <Preview>
-        {paperCount} paper{paperCount !== 1 ? "s" : ""} picked from{" "}
-        {digest.totalPapersScanned} this week — your PaperBrief digest 📄
+        {String(paperCount)} paper{paperCount !== 1 ? "s" : ""} picked from{" "}
+        {String(digest.totalPapersScanned)} this week — your PaperBrief digest 📄
       </Preview>
       <Body style={main}>
         <Container style={container}>
