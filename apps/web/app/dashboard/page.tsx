@@ -4,6 +4,7 @@ import { getServiceSupabase } from "../../lib/supabase";
 import { verifySessionCookie } from "../../lib/auth";
 import type { Track } from "./types";
 import TrackManager from "./components/TrackManager";
+import DigestPreview from "./components/DigestPreview";
 
 export default async function DashboardPage() {
   const session = cookies().get("pb_session")?.value;
@@ -35,6 +36,11 @@ export default async function DashboardPage() {
         </header>
 
         <TrackManager initialTracks={tracks} />
+
+        {/* Divider */}
+        <hr className="border-gray-800" />
+
+        <DigestPreview />
       </div>
     </div>
   );
