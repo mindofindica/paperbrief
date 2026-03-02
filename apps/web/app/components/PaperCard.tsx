@@ -6,7 +6,9 @@ interface Paper {
   arxiv_id: string;
   title: string;
   abstract: string | null;
-  published_date: string | null;
+  // legacy vs arxiv-coach field names
+  published_date?: string | null;
+  published_at?: string | null;
   llm_score: number | null;
   track: string | null;
 }
@@ -102,8 +104,8 @@ export default function PaperCard({ paper }: { paper: Paper }) {
               {paper.track}
             </span>
           )}
-          {paper.published_date && (
-            <span className="text-xs text-gray-500">{paper.published_date}</span>
+          {(paper.published_date ?? paper.published_at) && (
+            <span className="text-xs text-gray-500">{paper.published_date ?? paper.published_at}</span>
           )}
           <a
             href={`https://arxiv.org/abs/${paper.arxiv_id}`}
