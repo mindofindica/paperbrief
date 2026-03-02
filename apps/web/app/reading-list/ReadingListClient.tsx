@@ -7,7 +7,8 @@ interface Paper {
   arxiv_id: string;
   title: string;
   abstract: string | null;
-  published_date: string | null;
+  published_date?: string | null;
+  published_at?: string | null;
   llm_score: number | null;
   track: string | null;
 }
