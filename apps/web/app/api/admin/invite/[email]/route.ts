@@ -24,12 +24,13 @@ function getSupabase() {
 
 export async function POST(
   req: Request,
-  { params }: { params: { email: string } }
+  { params }: { params: Promise<{ email: string }> }
 ) {
   const authError = requireAdmin(req);
   if (authError) return authError;
 
-  const email = decodeURIComponent(params.email).toLowerCase().trim();
+  const { email: rawEmail } = await params;
+  const email = decodeURIComponent(rawEmail).toLowerCase().trim();
   if (!email || !email.includes("@")) {
     return NextResponse.json({ error: "Invalid email in URL" }, { status: 400 });
   }
