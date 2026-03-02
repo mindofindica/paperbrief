@@ -110,9 +110,10 @@ export async function POST(req: Request) {
     const result = await sendInviteEmail({ to: user.email, token });
     if (result.ok) {
       emailsSent++;
-    } else if (!result.skipped) {
+    } else {
       // Log but don't fail the whole batch for email delivery issues
-      console.warn("[admin/invite] Email failed for", user.email, result.error);
+      const err = "error" in result ? result.error : "unknown";
+      console.warn("[admin/invite] Email failed for", user.email, err);
     }
   }
 

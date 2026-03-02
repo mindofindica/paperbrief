@@ -76,8 +76,9 @@ export async function POST(
   const emailResult = await sendInviteEmail({ to: email, token });
   const emailSent = emailResult.ok;
 
-  if (!emailResult.ok && !emailResult.skipped) {
-    console.warn("[admin/invite/:email] Email delivery failed:", emailResult.error);
+  if (!emailResult.ok) {
+    const err = "error" in emailResult ? emailResult.error : "unknown";
+    console.warn("[admin/invite/:email] Email delivery failed:", err);
   }
 
   return NextResponse.json({
