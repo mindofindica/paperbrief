@@ -2,6 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "../../../lib/rate-limiter";
 import { validateEmail } from "../../../lib/email-validator";
+import {
+  sendWelcomeEmail,
+  sendAlreadyWaitlistedEmail,
+} from "../../../lib/email/send-welcome";
 
 export async function POST(req: Request) {
   // Extract IP from Vercel headers
@@ -46,11 +50,19 @@ export async function POST(req: Request) {
       .insert({ email, source: "landing" });
 
     if (!error) {
+      // New signup — send welcome email (fire-and-forget; don't block the response)
+      sendWelcomeEmail(email).catch((err) =>
+        console.error("[waitlist] Failed to send welcome email:", err)
+      );
       return NextResponse.json({ message: "You're on the list! We'll be in touch. 🎉" });
     }
 
     // Duplicate email (unique constraint violation)
     if (error.code === "23505") {
+      // Send a friendly "you're already in" email (fire-and-forget)
+      sendAlreadyWaitlistedEmail(email).catch((err) =>
+        console.error("[waitlist] Failed to send duplicate email:", err)
+      );
       return NextResponse.json({ message: "You're already on the list — sit tight!" });
     }
 
