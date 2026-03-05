@@ -68,7 +68,7 @@ export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResu
 
   try {
     const { data, error } = await resend.emails.send({
-      from: from ?? "PaperBrief <digest@paperbrief.io>",
+      from: from ?? "PaperBrief <hello@paperbrief.ai>",
       to: [to],
       subject,
       react: React.createElement(DigestEmail, {

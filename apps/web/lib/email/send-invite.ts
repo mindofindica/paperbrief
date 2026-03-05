@@ -59,7 +59,7 @@ export async function sendInviteEmail(opts: SendInviteOptions): Promise<SendResu
 
   try {
     const { data, error } = await resend.emails.send({
-      from: from ?? "PaperBrief <hello@paperbrief.io>",
+      from: from ?? "PaperBrief <hello@paperbrief.ai>",
       to: [to],
       subject: "You're in — welcome to PaperBrief Beta 🎉",
       react: React.createElement(BetaInviteEmail, { email: to, inviteUrl }),
