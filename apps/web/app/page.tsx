@@ -184,7 +184,7 @@ export default async function LandingPage() {
       {/* ── Footer ── */}
       <footer className="py-12 px-6 text-center text-gray-500 text-sm border-t border-gray-100">
         <p className="mb-2">
-          <a href="https://paperbrief.vercel.app" className="hover:text-gray-900">PaperBrief</a>
+          <a href="https://paperbrief.ai" className="hover:text-gray-900">PaperBrief</a>
           {" · "}
           <a href="/privacy" className="hover:text-gray-900">Privacy</a>
           {" · "}

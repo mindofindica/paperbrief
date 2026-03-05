@@ -105,7 +105,7 @@ describe('sendDigestEmail', () => {
     mockSend.mockResolvedValueOnce({ data: { id: 'email-id-1' }, error: null });
     await sendDigestEmail({ to: 'user@example.com', digest: makeDigest() });
     expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ from: 'PaperBrief <digest@paperbrief.io>' }),
+      expect.objectContaining({ from: 'PaperBrief <digest@paperbrief.ai>' }),
     );
   });
 

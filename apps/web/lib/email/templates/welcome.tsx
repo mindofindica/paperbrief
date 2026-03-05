@@ -65,7 +65,7 @@ export function WelcomeEmail({ email }: WelcomeEmailProps) {
 
           <Section style={ctaSection}>
             <Button
-              href="https://paperbrief.vercel.app"
+              href="https://paperbrief.ai"
               style={button}
             >
               Visit PaperBrief →
@@ -76,8 +76,8 @@ export function WelcomeEmail({ email }: WelcomeEmailProps) {
 
           <Text style={footer}>
             You&apos;re receiving this because you signed up at{" "}
-            <a href="https://paperbrief.vercel.app" style={link}>
-              paperbrief.vercel.app
+            <a href="https://paperbrief.ai" style={link}>
+              paperbrief.ai
             </a>
             . We won&apos;t spam you — just one email when access opens.
           </Text>

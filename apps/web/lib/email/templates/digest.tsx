@@ -101,8 +101,8 @@ function TrackSection({
 
 export function DigestEmail({
   digest,
-  unsubscribeUrl = "https://paperbrief.io/unsubscribe",
-  dashboardUrl = "https://paperbrief.io/dashboard",
+  unsubscribeUrl = "https://paperbrief.ai/unsubscribe",
+  dashboardUrl = "https://paperbrief.ai/dashboard",
 }: DigestEmailProps) {
   // Group entries by track
   const byTrack = new Map<string, DigestEntry[]>();

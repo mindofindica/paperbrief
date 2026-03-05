@@ -2,7 +2,7 @@
 
 Next.js 15 web app for PaperBrief.
 
-**Live:** https://paperbrief.vercel.app _(waitlist mode)_
+**Live:** https://paperbrief.ai _(waitlist mode)_
 
 ## Status
 

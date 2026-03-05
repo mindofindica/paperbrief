@@ -78,8 +78,8 @@ export function BetaInviteEmail({ email, inviteUrl }: BetaInviteEmailProps) {
 
           <Text style={footer}>
             You&apos;re receiving this because you signed up at{" "}
-            <a href="https://paperbrief.io" style={link}>
-              paperbrief.io
+            <a href="https://paperbrief.ai" style={link}>
+              paperbrief.ai
             </a>
             . If this was a mistake, you can safely ignore it.
           </Text>

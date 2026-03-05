@@ -46,7 +46,7 @@ export function AlreadyWaitlistedEmail({ email }: AlreadyWaitlistedEmailProps) {
 
           <Section style={ctaSection}>
             <Button
-              href="https://paperbrief.vercel.app"
+              href="https://paperbrief.ai"
               style={button}
             >
               Back to PaperBrief →
@@ -57,8 +57,8 @@ export function AlreadyWaitlistedEmail({ email }: AlreadyWaitlistedEmailProps) {
 
           <Text style={footer}>
             You&apos;re receiving this because you signed up at{" "}
-            <a href="https://paperbrief.vercel.app" style={link}>
-              paperbrief.vercel.app
+            <a href="https://paperbrief.ai" style={link}>
+              paperbrief.ai
             </a>
             .
           </Text>
