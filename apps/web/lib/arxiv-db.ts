@@ -1,5 +1,4 @@
 import Database from 'better-sqlite3';
-import path from 'path';
 import { randomUUID } from 'crypto';
 
 let _db: Database.Database | null = null;
@@ -33,6 +32,35 @@ export interface ReadingListEntry extends Paper {
   priority: number;
   added_at: string | null;
   notes: string | null;
+}
+
+export interface SearchPapersOptions {
+  query: string;
+  track?: string | null;
+  fromDate?: string | null;
+  limit?: number;
+}
+
+interface SearchRow {
+  arxiv_id: string;
+  title: string;
+  abstract: string;
+  published_at: string | null;
+  relevance_score: number | null;
+  track: string | null;
+  authors_json: string | null;
+}
+
+function buildFtsQuery(rawQuery: string): string {
+  const tokens = rawQuery
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.replace(/[^a-zA-Z0-9\-]/g, ''))
+    .filter((t) => t.length >= 2);
+
+  if (tokens.length === 0) return rawQuery.trim();
+
+  return tokens.map((t) => `"${t}"`).join(' ');
 }
 
 // Map real schema → normalised Paper shape
@@ -80,6 +108,69 @@ export function getTodaysPapers(): Paper[] {
     ORDER BY p.published_at DESC, ls.relevance_score DESC
     LIMIT 10
   `).all() as any[];
+
+  return rows.map(rowToPaper);
+}
+
+export function searchPapers(options: SearchPapersOptions): Paper[] {
+  const db = getDb();
+  const trimmedQuery = options.query.trim();
+  if (!trimmedQuery) return [];
+
+  const limit = Math.min(Math.max(1, options.limit ?? 5), 20);
+  const ftsQuery = buildFtsQuery(trimmedQuery);
+
+  let sql = `
+    SELECT
+      p.arxiv_id,
+      p.title,
+      p.abstract,
+      p.published_at,
+      p.authors_json,
+      ls.relevance_score,
+      (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
+    FROM papers_fts fts
+    JOIN papers p ON p.arxiv_id = fts.arxiv_id
+    LEFT JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    LEFT JOIN track_matches tm ON tm.arxiv_id = p.arxiv_id
+    WHERE papers_fts MATCH ?
+  `;
+
+  const params: Array<string | number> = [ftsQuery];
+
+  if (options.track) {
+    sql += ` AND tm.track_name LIKE ?`;
+    params.push(`%${options.track}%`);
+  }
+
+  if (options.fromDate) {
+    sql += ` AND DATE(p.published_at) >= DATE(?)`;
+    params.push(options.fromDate);
+  }
+
+  sql += `
+    GROUP BY p.arxiv_id
+    ORDER BY
+      ls.relevance_score DESC,
+      COALESCE(MAX(tm.score), 0) DESC,
+      rank
+    LIMIT ?
+  `;
+  params.push(limit);
+
+  let rows: SearchRow[] = [];
+  try {
+    rows = db.prepare(sql).all(...params) as SearchRow[];
+  } catch {
+    const fallbackQuery = trimmedQuery.replace(/[^a-zA-Z0-9 ]/g, ' ').trim();
+    if (!fallbackQuery) return [];
+
+    try {
+      rows = db.prepare(sql).all(fallbackQuery, ...params.slice(1)) as SearchRow[];
+    } catch {
+      return [];
+    }
+  }
 
   return rows.map(rowToPaper);
 }

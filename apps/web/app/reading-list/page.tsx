@@ -17,6 +17,7 @@ export default function ReadingListPage() {
           <a href="/digest" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
           <div className="flex gap-4 text-sm">
             <a href="/digest" className="text-gray-500 hover:text-gray-300 transition-colors">Digest</a>
+            <a href="/search" className="text-gray-500 hover:text-gray-300 transition-colors">Search</a>
             <a href="/reading-list" className="text-gray-100 font-medium">Reading List</a>
           </div>
         </div>
