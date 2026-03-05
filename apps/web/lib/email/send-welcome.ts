@@ -27,7 +27,7 @@ export async function sendWelcomeEmail(email: string): Promise<SendResult> {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: "PaperBrief <hello@paperbrief.app>",
+      from: "PaperBrief <hello@paperbrief.ai>",
       to: [email],
       subject: "You're on the PaperBrief waitlist 🎉",
       react: React.createElement(WelcomeEmail, { email }),
@@ -57,7 +57,7 @@ export async function sendAlreadyWaitlistedEmail(email: string): Promise<SendRes
 
   try {
     const { data, error } = await resend.emails.send({
-      from: "PaperBrief <hello@paperbrief.app>",
+      from: "PaperBrief <hello@paperbrief.ai>",
       to: [email],
       subject: "You're already on the PaperBrief waitlist!",
       react: React.createElement(AlreadyWaitlistedEmail, { email }),
