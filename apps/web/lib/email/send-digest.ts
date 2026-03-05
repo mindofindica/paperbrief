@@ -28,7 +28,11 @@ export interface SendDigestOptions {
   to: string;
   /** The built Digest object */
   digest: Digest;
-  /** Override unsubscribe URL (defaults to https://paperbrief.io/unsubscribe) */
+  /**
+   * Personalised unsubscribe URL (should include uid + email + HMAC token).
+   * Build with buildUnsubscribeUrl() from lib/unsubscribe-token.ts.
+   * Defaults to the bare /unsubscribe page (non-personalised fallback).
+   */
   unsubscribeUrl?: string;
   /** Override dashboard URL (defaults to https://paperbrief.io/dashboard) */
   dashboardUrl?: string;
