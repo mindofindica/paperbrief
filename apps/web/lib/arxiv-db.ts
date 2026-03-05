@@ -256,6 +256,102 @@ export function updateReadingList(arxivId: string, status: string, priority?: nu
   `).run(id, arxivId, status, priority ?? 0, now);
 }
 
+export function removeFromReadingList(arxivId: string): void {
+  const db = getDb();
+  db.prepare(`
+    DELETE FROM reading_list
+    WHERE paper_id = ?
+  `).run(arxivId);
+}
+
+export function getRecommendationBasis(): 'your feedback' | 'top papers' {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT 1
+    FROM paper_feedback
+    WHERE feedback_type IN ('love', 'save')
+    LIMIT 1
+  `).get() as { 1: number } | undefined;
+
+  return row ? 'your feedback' : 'top papers';
+}
+
+export function getRecommendations(limit = 20): Paper[] {
+  const db = getDb();
+  const safeLimit = Math.min(Math.max(1, Math.trunc(limit)), 100);
+  const basedOnFeedback = getRecommendationBasis() === 'your feedback';
+
+  if (!basedOnFeedback) {
+    const fallbackRows = db.prepare(`
+      SELECT
+        p.arxiv_id,
+        p.title,
+        p.abstract,
+        p.published_at,
+        p.authors_json,
+        ls.relevance_score,
+        (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
+      FROM papers p
+      LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+      ORDER BY ls.relevance_score DESC, p.published_at DESC
+      LIMIT ?
+    `).all(safeLimit) as any[];
+
+    return fallbackRows.map(rowToPaper);
+  }
+
+  const preferredTrackRows = db.prepare(`
+    SELECT DISTINCT tm.track_name
+    FROM paper_feedback pf
+    JOIN track_matches tm ON pf.paper_id = tm.arxiv_id
+    WHERE pf.feedback_type IN ('love', 'save')
+  `).all() as Array<{ track_name: string }>;
+
+  const preferredTracks = preferredTrackRows.map((row) => row.track_name);
+  const placeholders = preferredTracks.map(() => '?').join(', ') || "''";
+  const allowAllTracks = preferredTracks.length === 0 ? 1 : 0;
+  const sql = `
+    SELECT
+      p.arxiv_id,
+      p.title,
+      p.abstract,
+      p.published_at,
+      p.authors_json,
+      ls.relevance_score,
+      (
+        SELECT tm2.track_name
+        FROM track_matches tm2
+        WHERE tm2.arxiv_id = p.arxiv_id
+          AND (? = 1 OR tm2.track_name IN (${placeholders}))
+        ORDER BY tm2.score DESC
+        LIMIT 1
+      ) AS track
+    FROM papers p
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE p.arxiv_id NOT IN (SELECT paper_id FROM paper_feedback)
+      AND p.arxiv_id NOT IN (SELECT paper_id FROM reading_list)
+      AND (
+        ? = 1 OR EXISTS (
+          SELECT 1
+          FROM track_matches tm3
+          WHERE tm3.arxiv_id = p.arxiv_id
+            AND tm3.track_name IN (${placeholders})
+        )
+      )
+    ORDER BY ls.relevance_score DESC, p.published_at DESC
+    LIMIT ?
+  `;
+
+  const rows = db.prepare(sql).all(
+    allowAllTracks,
+    ...preferredTracks,
+    allowAllTracks,
+    ...preferredTracks,
+    safeLimit
+  ) as any[];
+  return rows.map(rowToPaper);
+}
+
 export function getRawDb(): Database.Database {
   return getDb();
 }

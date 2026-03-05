@@ -47,6 +47,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <div className="flex gap-4 text-sm">
             <a href="/digest" className="text-gray-500 hover:text-gray-300 transition-colors">Digest</a>
             <a href="/search" className="text-gray-100 font-medium">Search</a>
+            <a href="/recommend" className="text-gray-500 hover:text-gray-300 transition-colors">Recommend</a>
             <a href="/reading-list" className="text-gray-500 hover:text-gray-300 transition-colors">Reading List</a>
           </div>
         </div>
