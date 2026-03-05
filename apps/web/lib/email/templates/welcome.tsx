@@ -145,6 +145,9 @@ const highlightBox: React.CSSProperties = {
   borderRadius: "4px",
   margin: "0 40px 24px",
   padding: "12px 16px",
+  width: "100%",
+  boxSizing: "border-box",
+  display: "block",
 };
 
 const highlightText: React.CSSProperties = {
@@ -152,6 +155,7 @@ const highlightText: React.CSSProperties = {
   fontSize: "15px",
   lineHeight: "1.5",
   margin: "0",
+  display: "block",
 };
 
 const ctaSection: React.CSSProperties = {
