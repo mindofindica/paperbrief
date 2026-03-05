@@ -12,6 +12,13 @@ vi.mock('../../../lib/auth', () => ({
   verifySessionCookie: vi.fn(),
 }));
 
+// Mock stripe — tracks route checks plan limits
+vi.mock('../../../lib/stripe', () => ({
+  getSubscription: vi.fn(),
+}));
+
+import { getSubscription } from '../../../lib/stripe';
+
 type QueryMock = {
   select: ReturnType<typeof vi.fn>;
   eq: ReturnType<typeof vi.fn>;
@@ -35,9 +42,21 @@ function createQueryMock(): QueryMock {
 
 const getServiceSupabaseMock = vi.mocked(getServiceSupabase);
 const verifySessionCookieMock = vi.mocked(verifySessionCookie);
+const getSubscriptionMock = vi.mocked(getSubscription);
+
+const FREE_SUBSCRIPTION = {
+  plan: 'free' as const,
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  planExpiresAt: null,
+  trackLimit: 1,
+  digestFrequency: 'weekly',
+};
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // Restore stripe mock after reset — free plan, 0 tracks (no count query blocking)
+  getSubscriptionMock.mockResolvedValue(FREE_SUBSCRIPTION);
 });
 
 describe('tracks api', () => {

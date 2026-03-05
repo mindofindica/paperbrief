@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '../../../lib/supabase';
 import { verifySessionCookie } from '../../../lib/auth';
+import { getSubscription } from '../../../lib/stripe';
 
 type TrackInsert = {
   name: string;
@@ -56,6 +57,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const supabase = getServiceSupabase();
+
+  // ── Plan limit check ───────────────────────────────────────────────────────
+  // Count active tracks; compare against user's plan limit
+  const subscription = await getSubscription(userId);
+  const { count: trackCount } = await supabase
+    .from('tracks')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('active', true);
+
+  if ((trackCount ?? 0) >= subscription.trackLimit) {
+    const isPro = subscription.plan === 'pro';
+    return NextResponse.json(
+      {
+        error: isPro
+          ? `Pro plan limit reached (${subscription.trackLimit} tracks)`
+          : `Free plan allows ${subscription.trackLimit} track. Upgrade to Pro for up to 5 tracks.`,
+        plan: subscription.plan,
+        trackLimit: subscription.trackLimit,
+        upgrade: !isPro,
+      },
+      { status: 403 },
+    );
+  }
+
   const { data, error } = await supabase
     .from('tracks')
     .insert({
