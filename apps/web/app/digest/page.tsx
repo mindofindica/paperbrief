@@ -37,18 +37,22 @@ export default function DigestPage() {
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
-        <header className="space-y-3">
-          <h1 className="text-2xl font-bold text-gray-100">Today&apos;s Digest</h1>
-          <div className="flex items-center justify-between">
-            <p className="text-gray-500 text-sm">
-              {displayDate} · {papers.length} papers
-            </p>
-            <Link
-              href="/digest/archive"
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+        <header>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-100">Today&apos;s Digest</h1>
+              <p className="text-gray-500 text-sm mt-1">{today} · {papers.length} papers</p>
+            </div>
+            <a
+              href="/rss"
+              title="Subscribe via RSS"
+              className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 transition-colors border border-orange-800 hover:border-orange-600 rounded-lg px-3 py-1.5 shrink-0"
             >
-              Archive →
-            </Link>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19.01 7.38 20 6.18 20C4.98 20 4 19.01 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
+              </svg>
+              RSS
+            </a>
           </div>
         </header>
 
