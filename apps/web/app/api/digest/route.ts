@@ -17,6 +17,7 @@ import {
   buildDigest,
 } from '@paperbrief/core';
 import { sendDigestEmail } from '../../../lib/email/send-digest';
+import { buildUnsubscribeUrl } from '../../../lib/unsubscribe-token';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Verify cron secret
@@ -109,7 +110,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const email = user?.user?.email;
       if (!email) continue;
 
-      const sendResult = await sendDigestEmail({ to: email, digest });
+      // Skip users who have unsubscribed from digest emails
+      const { data: emailPrefs } = await supabase
+        .from('user_email_prefs')
+        .select('digest_subscribed')
+        .eq('user_id', uid)
+        .single();
+      if (emailPrefs && emailPrefs.digest_subscribed === false) {
+        console.log('[digest] Skipping unsubscribed user:', uid);
+        continue;
+      }
+
+      // Build personalised unsubscribe URL (HMAC token — no DB lookup needed)
+      const unsubscribeUrl = buildUnsubscribeUrl(uid, email);
+
+      const sendResult = await sendDigestEmail({ to: email, digest, unsubscribeUrl });
       if (!sendResult.ok && !('skipped' in sendResult && sendResult.skipped)) {
         console.error('[digest] Failed to send email to', email, ':', (sendResult as any).error);
       }

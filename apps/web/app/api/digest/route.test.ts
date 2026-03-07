@@ -96,6 +96,7 @@ function makeClientMock({
   tracksError = null as unknown,
   userEmail = 'user@example.com',
   upsertResult = { error: null },
+  emailPrefs = { digest_subscribed: true } as { digest_subscribed: boolean } | null,
 } = {}) {
   const authAdmin = {
     getUserById: vi.fn().mockResolvedValue({
@@ -103,12 +104,20 @@ function makeClientMock({
     }),
   };
 
-  const selectQuery = {
+  // tracks query — uses Promise-like .then()
+  const tracksSelectQuery = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     then: vi.fn((resolve: (v: unknown) => void) =>
       resolve({ data: tracks, error: tracksError })
     ),
+  };
+
+  // user_email_prefs query — uses .single() → returns a Promise
+  const emailPrefsSelectQuery = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({ data: emailPrefs, error: null }),
   };
 
   const upsertQuery = {
@@ -118,7 +127,8 @@ function makeClientMock({
   return {
     from: vi.fn().mockImplementation((table: string) => {
       if (table === 'deliveries') return upsertQuery;
-      return selectQuery;
+      if (table === 'user_email_prefs') return emailPrefsSelectQuery;
+      return tracksSelectQuery;
     }),
     auth: { admin: authAdmin },
   };
@@ -267,6 +277,39 @@ describe('POST /api/digest', () => {
     // Both users processed (delivery recorded even if email failed)
     const body = await res.json() as { processed: number };
     expect(body.processed).toBe(2);
+  });
+
+  it('skips delivery for users who have unsubscribed from emails', async () => {
+    mockCreateClient.mockReturnValue(
+      makeClientMock({ emailPrefs: { digest_subscribed: false } }) as never
+    );
+    mockFetchRecentPapers.mockResolvedValue([PAPER]);
+    mockPrefilterPapers.mockReturnValue([PAPER]);
+    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
+    mockBuildDigest.mockReturnValue(DIGEST);
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json() as { processed: number };
+    // User has opted out — no email sent, delivery not recorded
+    expect(mockSendDigestEmail).not.toHaveBeenCalled();
+    expect(body.processed).toBe(0);
+  });
+
+  it('sends email to users with no prefs row (default = subscribed)', async () => {
+    mockCreateClient.mockReturnValue(
+      makeClientMock({ emailPrefs: null }) as never
+    );
+    mockFetchRecentPapers.mockResolvedValue([PAPER]);
+    mockPrefilterPapers.mockReturnValue([PAPER]);
+    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
+    mockBuildDigest.mockReturnValue(DIGEST);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'email-id-1' });
+
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(200);
+    // No prefs row → assume subscribed → send
+    expect(mockSendDigestEmail).toHaveBeenCalledOnce();
   });
 
   it('returns 500 on unexpected error', async () => {
