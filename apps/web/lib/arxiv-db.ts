@@ -256,6 +256,223 @@ export function updateReadingList(arxivId: string, status: string, priority?: nu
   `).run(id, arxivId, status, priority ?? 0, now);
 }
 
+// ── Weekly digest ────────────────────────────────────────────────────────────
+
+export interface WeeklyTrackSection {
+  track: string;
+  papers: Paper[];
+}
+
+export interface WeeklyStats {
+  totalPapers: number;
+  totalTracks: number;
+  topTrack: string | null;
+  fromDate: string;
+  toDate: string;
+}
+
+export interface WeeklyKeyword {
+  keyword: string;
+  count: number;
+  /** Percentage change vs. prior 7-day window (null if no prior data) */
+  pctChange: number | null;
+  direction: 'rising' | 'falling' | 'stable';
+}
+
+// Stopwords for keyword extraction (mirrors arxiv-coach trends.ts)
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+  'of', 'with', 'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be',
+  'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+  'would', 'could', 'should', 'may', 'might', 'can', 'shall',
+  'this', 'that', 'these', 'those', 'its', 'it', 'we', 'our', 'they',
+  'via', 'into', 'towards', 'toward', 'through', 'under', 'over',
+  'about', 'up', 'out', 'all', 'you', 'need', 'new', 'large', 'based',
+  'approach', 'method', 'methods', 'task', 'tasks', 'paper', 'papers',
+  'study', 'work', 'analysis', 'evaluation', 'results', 'using', 'towards',
+]);
+
+export function extractTitleKeywords(title: string): string[] {
+  const normalised = title.toLowerCase().replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const tokens = normalised.split(' ').filter(t => t.length >= 3);
+  const singles = tokens.filter(t => !STOPWORDS.has(t) && !/^\d+$/.test(t));
+  const bigrams: string[] = [];
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const a = tokens[i]!;
+    const b = tokens[i + 1]!;
+    if (!STOPWORDS.has(a) && !STOPWORDS.has(b)) {
+      bigrams.push(`${a} ${b}`);
+    }
+  }
+  return [...new Set([...singles, ...bigrams])];
+}
+
+/**
+ * Returns papers from the last 7 days grouped by track, ordered by relevance.
+ * Falls back to track_matches if digest_papers is sparse.
+ */
+export function getWeeklyPapers(): WeeklyTrackSection[] {
+  const db = getDb();
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
+
+  const rows = db.prepare(`
+    SELECT DISTINCT
+      p.arxiv_id,
+      p.title,
+      p.abstract,
+      p.published_at,
+      p.authors_json,
+      ls.relevance_score,
+      (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
+    FROM papers p
+    LEFT JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+      AND DATE(p.published_at) >= DATE(?)
+    ORDER BY ls.relevance_score DESC, p.published_at DESC
+  `).all(fromDate) as any[];
+
+  // Group by track
+  const trackMap = new Map<string, Paper[]>();
+  for (const row of rows) {
+    const track = row.track ?? 'Other';
+    if (!trackMap.has(track)) trackMap.set(track, []);
+    trackMap.get(track)!.push(rowToPaper(row));
+  }
+
+  // Sort tracks by paper count descending
+  return Array.from(trackMap.entries())
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([track, papers]) => ({ track, papers }));
+}
+
+/**
+ * Returns summary stats for the past 7 days.
+ */
+export function getWeeklyStats(): WeeklyStats {
+  const db = getDb();
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
+  const toDate = new Date().toISOString().slice(0, 10);
+
+  const row = db.prepare(`
+    SELECT
+      COUNT(DISTINCT p.arxiv_id) AS totalPapers,
+      COUNT(DISTINCT (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id LIMIT 1)) AS totalTracks
+    FROM papers p
+    JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+      AND DATE(p.published_at) >= DATE(?)
+  `).get(fromDate) as any;
+
+  // Find top track
+  const topTrackRow = db.prepare(`
+    SELECT
+      (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track,
+      COUNT(*) AS cnt
+    FROM papers p
+    JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+      AND DATE(p.published_at) >= DATE(?)
+    GROUP BY track
+    ORDER BY cnt DESC
+    LIMIT 1
+  `).get(fromDate) as any;
+
+  return {
+    totalPapers: row?.totalPapers ?? 0,
+    totalTracks: row?.totalTracks ?? 0,
+    topTrack: topTrackRow?.track ?? null,
+    fromDate,
+    toDate,
+  };
+}
+
+/**
+ * Analyse keyword frequency trends for the past 7 days vs the prior 7 days.
+ * Returns top trending keywords with direction and % change.
+ */
+export function getWeeklyKeywordTrends(limit = 15): WeeklyKeyword[] {
+  const db = getDb();
+  const now = new Date();
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  const fourteenDaysAgo = new Date(now);
+  fourteenDaysAgo.setDate(now.getDate() - 14);
+
+  const recentFrom = sevenDaysAgo.toISOString().slice(0, 10);
+  const priorFrom = fourteenDaysAgo.toISOString().slice(0, 10);
+
+  // Papers in the recent 7 days
+  const recentRows = db.prepare(`
+    SELECT p.title, ls.relevance_score
+    FROM papers p
+    JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+      AND DATE(p.published_at) >= DATE(?)
+    ORDER BY ls.relevance_score DESC
+  `).all(recentFrom) as any[];
+
+  // Papers in the prior 7 days
+  const priorRows = db.prepare(`
+    SELECT p.title, ls.relevance_score
+    FROM papers p
+    JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+      AND DATE(p.published_at) >= DATE(?)
+      AND DATE(p.published_at) < DATE(?)
+    ORDER BY ls.relevance_score DESC
+  `).all(priorFrom, recentFrom) as any[];
+
+  function countKeywords(rows: any[]): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const keywords = extractTitleKeywords(row.title);
+      for (const kw of keywords) {
+        counts.set(kw, (counts.get(kw) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }
+
+  const recentCounts = countKeywords(recentRows);
+  const priorCounts = countKeywords(priorRows);
+
+  const results: WeeklyKeyword[] = [];
+
+  for (const [keyword, count] of recentCounts) {
+    if (count < 2) continue; // require at least 2 mentions to surface
+    const priorCount = priorCounts.get(keyword) ?? 0;
+
+    let pctChange: number | null = null;
+    let direction: WeeklyKeyword['direction'] = 'stable';
+
+    if (priorCount === 0) {
+      pctChange = null; // Newly emerged
+      direction = 'rising';
+    } else {
+      pctChange = Math.round(((count - priorCount) / priorCount) * 100);
+      if (pctChange >= 30) direction = 'rising';
+      else if (pctChange <= -30) direction = 'falling';
+      else direction = 'stable';
+    }
+
+    results.push({ keyword, count, pctChange, direction });
+  }
+
+  // Sort: rising first by count, then stable, then falling; within each by count
+  results.sort((a, b) => {
+    const dirOrder = { rising: 0, stable: 1, falling: 2 };
+    const dirDiff = dirOrder[a.direction] - dirOrder[b.direction];
+    if (dirDiff !== 0) return dirDiff;
+    return b.count - a.count;
+  });
+
+  return results.slice(0, limit);
+}
+
 export function getRawDb(): Database.Database {
   return getDb();
 }
