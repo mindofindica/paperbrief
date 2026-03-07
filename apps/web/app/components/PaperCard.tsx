@@ -92,8 +92,13 @@ export default function PaperCard({ paper }: { paper: Paper }) {
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-lg font-semibold text-gray-100 leading-snug flex-1">
-            {paper.title}
+          <h3 className="text-lg font-semibold leading-snug flex-1">
+            <a
+              href={`/paper/${paper.arxiv_id}`}
+              className="text-gray-100 hover:text-blue-300 transition-colors no-underline"
+            >
+              {paper.title}
+            </a>
           </h3>
           <span className="text-yellow-400 text-sm whitespace-nowrap font-mono">{stars}</span>
         </div>

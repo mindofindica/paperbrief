@@ -319,7 +319,176 @@ export function getWeeklyPapers(): WeeklyTrackSection[] {
 
   const rows = db.prepare(`
     SELECT DISTINCT
-      p.arxiv_id,
+// ---------------------------------------------------------------------------
+// Digest history
+// ---------------------------------------------------------------------------
+
+export interface DigestDate {
+  date: string; // YYYY-MM-DD
+  paperCount: number;
+}
+
+/**
+ * Returns all dates that have a sent digest, ordered newest-first.
+ * Falls back to dates with scored papers if sent_digests is empty.
+ */
+export function getDigestDates(limit = 30): DigestDate[] {
+  const db = getDb();
+
+  // Primary: dates from sent_digests (official email sends)
+  const fromDigests = db.prepare(`
+    SELECT sd.digest_date as date,
+           COUNT(p.arxiv_id) as paperCount
+    FROM sent_digests sd
+    LEFT JOIN papers p ON DATE(p.published_at) = sd.digest_date
+    GROUP BY sd.digest_date
+    ORDER BY sd.digest_date DESC
+    LIMIT ?
+  `).all(limit) as any[];
+
+  if (fromDigests.length > 0) {
+    return fromDigests.map((row) => ({
+      date: row.date,
+      paperCount: Number(row.paperCount),
+    }));
+  }
+
+  // Fallback: any date with scored papers
+  const fromPapers = db.prepare(`
+    SELECT DATE(p.published_at) as date, COUNT(*) as paperCount
+    FROM papers p
+    JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    GROUP BY DATE(p.published_at)
+    ORDER BY date DESC
+    LIMIT ?
+  `).all(limit) as any[];
+
+  return fromPapers.map((row) => ({
+    date: row.date,
+    paperCount: Number(row.paperCount),
+  }));
+}
+
+/**
+ * Returns papers for a specific YYYY-MM-DD date, ordered by relevance score.
+ * Uses digest_papers if available (old weekly digest format), otherwise falls
+ * back to papers table filtered by published_at date.
+ */
+export function getPapersByDate(date: string, limit = 30): Paper[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
+  const db = getDb();
+
+  // Try digest_papers first (old weekly format with curated 5 papers)
+  const fromDigestPapers = db.prepare(`
+    SELECT p.*, ls.relevance_score, dp.track_name as track
+    FROM digest_papers dp
+    JOIN papers p ON dp.arxiv_id = p.arxiv_id
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE dp.digest_date = ?
+    ORDER BY ls.relevance_score DESC
+    LIMIT ?
+  `).all(date, limit) as any[];
+
+  if (fromDigestPapers.length > 0) {
+    return fromDigestPapers.map(rowToPaper);
+  }
+
+  // Fallback: scored papers published on that day (daily digest)
+  const fromPapers = db.prepare(`
+    SELECT p.*, ls.relevance_score,
+           (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track
+    FROM papers p
+    JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE DATE(p.published_at) = ?
+      AND ls.relevance_score IS NOT NULL
+    ORDER BY ls.relevance_score DESC, p.published_at DESC
+    LIMIT ?
+  `).all(date, limit) as any[];
+
+  return fromPapers.map(rowToPaper);
+}
+
+/**
+ * Returns the previous and next digest dates relative to a given date.
+ */
+export function getAdjacentDigestDates(date: string): { prev: string | null; next: string | null } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { prev: null, next: null };
+  const db = getDb();
+
+  const prevRow = db.prepare(`
+    SELECT digest_date FROM sent_digests
+    WHERE digest_date < ?
+    ORDER BY digest_date DESC
+    LIMIT 1
+  `).get(date) as any;
+
+  const nextRow = db.prepare(`
+    SELECT digest_date FROM sent_digests
+    WHERE digest_date > ?
+    ORDER BY digest_date ASC
+    LIMIT 1
+  `).get(date) as any;
+
+  return {
+    prev: prevRow?.digest_date ?? null,
+    next: nextRow?.digest_date ?? null,
+  };
+export function removeFromReadingList(arxivId: string): void {
+  const db = getDb();
+  db.prepare(`
+    DELETE FROM reading_list
+    WHERE paper_id = ?
+  `).run(arxivId);
+}
+
+export function getRecommendationBasis(): 'your feedback' | 'top papers' {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT 1
+    FROM paper_feedback
+    WHERE feedback_type IN ('love', 'save')
+    LIMIT 1
+  `).get() as { 1: number } | undefined;
+
+  return row ? 'your feedback' : 'top papers';
+}
+
+export function getRecommendations(limit = 20): Paper[] {
+  const db = getDb();
+  const safeLimit = Math.min(Math.max(1, Math.trunc(limit)), 100);
+  const basedOnFeedback = getRecommendationBasis() === 'your feedback';
+
+  if (!basedOnFeedback) {
+    const fallbackRows = db.prepare(`
+      SELECT
+        p.arxiv_id,
+        p.title,
+        p.abstract,
+        p.published_at,
+        p.authors_json,
+        ls.relevance_score,
+        (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
+      FROM papers p
+      LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+      ORDER BY ls.relevance_score DESC, p.published_at DESC
+      LIMIT ?
+    `).all(safeLimit) as any[];
+
+    return fallbackRows.map(rowToPaper);
+  }
+
+  const preferredTrackRows = db.prepare(`
+    SELECT DISTINCT tm.track_name
+    FROM paper_feedback pf
+    JOIN track_matches tm ON pf.paper_id = tm.arxiv_id
+    WHERE pf.feedback_type IN ('love', 'save')
+  `).all() as Array<{ track_name: string }>;
+
+  const preferredTracks = preferredTrackRows.map((row) => row.track_name);
+  const placeholders = preferredTracks.map(() => '?').join(', ') || "''";
+  const allowAllTracks = preferredTracks.length === 0 ? 1 : 0;
+  const sql = `
+    SELECT      p.arxiv_id,
       p.title,
       p.abstract,
       p.published_at,
@@ -472,7 +641,38 @@ export function getWeeklyKeywordTrends(limit = 15): WeeklyKeyword[] {
 
   return results.slice(0, limit);
 }
+      (
+        SELECT tm2.track_name
+        FROM track_matches tm2
+        WHERE tm2.arxiv_id = p.arxiv_id
+          AND (? = 1 OR tm2.track_name IN (${placeholders}))
+        ORDER BY tm2.score DESC
+        LIMIT 1
+      ) AS track
+    FROM papers p
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE p.arxiv_id NOT IN (SELECT paper_id FROM paper_feedback)
+      AND p.arxiv_id NOT IN (SELECT paper_id FROM reading_list)
+      AND (
+        ? = 1 OR EXISTS (
+          SELECT 1
+          FROM track_matches tm3
+          WHERE tm3.arxiv_id = p.arxiv_id
+            AND tm3.track_name IN (${placeholders})
+        )
+      )
+    ORDER BY ls.relevance_score DESC, p.published_at DESC
+    LIMIT ?
+  `;
 
+  const rows = db.prepare(sql).all(
+    allowAllTracks,
+    ...preferredTracks,
+    allowAllTracks,
+    ...preferredTracks,
+    safeLimit
+  ) as any[];
+  return rows.map(rowToPaper);}
 export function getRawDb(): Database.Database {
   return getDb();
 }

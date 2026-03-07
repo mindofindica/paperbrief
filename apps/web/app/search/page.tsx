@@ -1,5 +1,6 @@
 import { searchPapers } from '../../lib/arxiv-db';
 import PaperCard from '../components/PaperCard';
+import AppNav from '../components/AppNav';
 
 export const dynamic = 'force-dynamic';
 

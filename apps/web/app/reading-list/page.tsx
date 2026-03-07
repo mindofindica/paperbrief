@@ -1,5 +1,6 @@
 import { getReadingList } from '../../lib/arxiv-db';
 import ReadingListClient from './ReadingListClient';
+import AppNav from '../components/AppNav';
 
 export const dynamic = 'force-dynamic';
 
