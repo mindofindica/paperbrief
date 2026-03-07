@@ -273,6 +273,9 @@ export interface RssPaper {
 
 export interface TrackSummary {
   track: string;
+  paperCount: number;
+}
+
 // ── Weekly digest ────────────────────────────────────────────────────────────
 
 export interface WeeklyTrackSection {
@@ -336,12 +339,41 @@ export function getWeeklyPapers(): WeeklyTrackSection[] {
 
   const rows = db.prepare(`
     SELECT DISTINCT
+      p.arxiv_id,
+      p.title,
+      p.abstract,
+      p.published_at,
+      p.authors_json,
+      ls.relevance_score,
+      (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
+    FROM papers p
+    LEFT JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+    WHERE ls.relevance_score IS NOT NULL
+      AND DATE(p.published_at) >= DATE(?)
+    ORDER BY ls.relevance_score DESC, p.published_at DESC
+  `).all(fromDate) as any[];
+
+  // Group by track
+  const trackMap = new Map<string, Paper[]>();
+  for (const row of rows) {
+    const track = row.track ?? 'Other';
+    if (!trackMap.has(track)) trackMap.set(track, []);
+    trackMap.get(track)!.push(rowToPaper(row));
+  }
+
+  // Sort tracks by paper count descending
+  return Array.from(trackMap.entries())
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([track, papers]) => ({ track, papers }));
+}
+
 // ---------------------------------------------------------------------------
 // Digest history
 // ---------------------------------------------------------------------------
 
 export interface DigestDate {
-  date: string; // YYYY-MM-DD  paperCount: number;
+  date: string; // YYYY-MM-DD
+  paperCount: number;
 }
 
 /**
@@ -425,6 +457,10 @@ export function getRssPapers(options: {
     track: row.track ?? null,
     authors: row.authors_json ?? null,
     url: `https://arxiv.org/abs/${row.arxiv_id}`,
+  }));
+}
+
+/**
  * Returns all dates that have a sent digest, ordered newest-first.
  * Falls back to dates with scored papers if sent_digests is empty.
  */
@@ -461,7 +497,8 @@ export function getDigestDates(limit = 30): DigestDate[] {
 
   return fromPapers.map((row) => ({
     date: row.date,
-    paperCount: Number(row.paperCount),  }));
+    paperCount: Number(row.paperCount),
+  }));
 }
 
 /**
@@ -485,6 +522,7 @@ export function getAvailableTracks(): TrackSummary[] {
   }));
 }
 
+/**
  * Returns papers for a specific YYYY-MM-DD date, ordered by relevance score.
  * Uses digest_papers if available (old weekly digest format), otherwise falls
  * back to papers table filtered by published_at date.
@@ -548,6 +586,8 @@ export function getAdjacentDigestDates(date: string): { prev: string | null; nex
     prev: prevRow?.digest_date ?? null,
     next: nextRow?.digest_date ?? null,
   };
+}
+
 export function removeFromReadingList(arxivId: string): void {
   const db = getDb();
   db.prepare(`
@@ -603,32 +643,45 @@ export function getRecommendations(limit = 20): Paper[] {
   const placeholders = preferredTracks.map(() => '?').join(', ') || "''";
   const allowAllTracks = preferredTracks.length === 0 ? 1 : 0;
   const sql = `
-    SELECT      p.arxiv_id,
+    SELECT
+      p.arxiv_id,
       p.title,
       p.abstract,
       p.published_at,
       p.authors_json,
       ls.relevance_score,
-      (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
+      (
+        SELECT tm2.track_name
+        FROM track_matches tm2
+        WHERE tm2.arxiv_id = p.arxiv_id
+          AND (? = 1 OR tm2.track_name IN (${placeholders}))
+        ORDER BY tm2.score DESC
+        LIMIT 1
+      ) AS track
     FROM papers p
-    LEFT JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
-    WHERE ls.relevance_score IS NOT NULL
-      AND DATE(p.published_at) >= DATE(?)
+    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+    WHERE p.arxiv_id NOT IN (SELECT paper_id FROM paper_feedback)
+      AND p.arxiv_id NOT IN (SELECT paper_id FROM reading_list)
+      AND (
+        ? = 1 OR EXISTS (
+          SELECT 1
+          FROM track_matches tm3
+          WHERE tm3.arxiv_id = p.arxiv_id
+            AND tm3.track_name IN (${placeholders})
+        )
+      )
     ORDER BY ls.relevance_score DESC, p.published_at DESC
-  `).all(fromDate) as any[];
+    LIMIT ?
+  `;
 
-  // Group by track
-  const trackMap = new Map<string, Paper[]>();
-  for (const row of rows) {
-    const track = row.track ?? 'Other';
-    if (!trackMap.has(track)) trackMap.set(track, []);
-    trackMap.get(track)!.push(rowToPaper(row));
-  }
-
-  // Sort tracks by paper count descending
-  return Array.from(trackMap.entries())
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([track, papers]) => ({ track, papers }));
+  const rows = db.prepare(sql).all(
+    allowAllTracks,
+    ...preferredTracks,
+    allowAllTracks,
+    ...preferredTracks,
+    safeLimit
+  ) as any[];
+  return rows.map(rowToPaper);
 }
 
 /**
@@ -756,38 +809,8 @@ export function getWeeklyKeywordTrends(limit = 15): WeeklyKeyword[] {
 
   return results.slice(0, limit);
 }
-      (
-        SELECT tm2.track_name
-        FROM track_matches tm2
-        WHERE tm2.arxiv_id = p.arxiv_id
-          AND (? = 1 OR tm2.track_name IN (${placeholders}))
-        ORDER BY tm2.score DESC
-        LIMIT 1
-      ) AS track
-    FROM papers p
-    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
-    WHERE p.arxiv_id NOT IN (SELECT paper_id FROM paper_feedback)
-      AND p.arxiv_id NOT IN (SELECT paper_id FROM reading_list)
-      AND (
-        ? = 1 OR EXISTS (
-          SELECT 1
-          FROM track_matches tm3
-          WHERE tm3.arxiv_id = p.arxiv_id
-            AND tm3.track_name IN (${placeholders})
-        )
-      )
-    ORDER BY ls.relevance_score DESC, p.published_at DESC
-    LIMIT ?
-  `;
 
-  const rows = db.prepare(sql).all(
-    allowAllTracks,
-    ...preferredTracks,
-    allowAllTracks,
-    ...preferredTracks,
-    safeLimit
-  ) as any[];
-  return rows.map(rowToPaper);}export function getRawDb(): Database.Database {
+export function getRawDb(): Database.Database {
   return getDb();
 }
 

@@ -1,5 +1,5 @@
 /**
- * /rss — Feed directory page
+ * /rss-feeds — Feed directory page
  *
  * Lists all available PaperBrief RSS feeds (full digest + per-track).
  * Serves as a human-readable landing page; the actual XML feed is at GET /rss.
