@@ -3,7 +3,7 @@ import { createMagicToken } from '../../../../lib/auth';
 import { getTodaysPapers } from '../../../../lib/arxiv-db';
 import { execSync } from 'child_process';
 
-const BASE_URL = process.env.PAPERBRIEF_BASE_URL || 'https://paperbrief.vercel.app';
+const BASE_URL = process.env.PAPERBRIEF_BASE_URL || 'https://paperbrief.ai';
 const SIGNAL_SENDER = '+31643741711';
 const SIGNAL_RECIPIENT = '+31639420916';
 

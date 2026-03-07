@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createMagicToken } from '../../../../lib/auth';
 
-const BASE_URL = process.env.PAPERBRIEF_BASE_URL || 'https://paperbrief.vercel.app';
+const BASE_URL = process.env.PAPERBRIEF_BASE_URL || 'https://paperbrief.ai';
 
 export async function GET() {
   try {

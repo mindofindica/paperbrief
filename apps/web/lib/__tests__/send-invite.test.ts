@@ -103,7 +103,7 @@ describe("sendInviteEmail", () => {
     const result = await sendInviteEmail({
       to: "user@example.com",
       token: "mytoken",
-      baseUrl: "https://beta.paperbrief.io",
+      baseUrl: "https://beta.paperbrief.ai",
     });
     expect(result.ok).toBe(true);
     expect(sendMock).toHaveBeenCalledOnce();

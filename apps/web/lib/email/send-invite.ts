@@ -23,7 +23,7 @@ export interface SendInviteOptions {
   to: string;
   /** Magic-link token — embedded in the invite URL */
   token: string;
-  /** Base URL for the invite link (defaults to NEXT_PUBLIC_APP_URL or https://paperbrief.io) */
+  /** Base URL for the invite link (defaults to NEXT_PUBLIC_APP_URL or https://paperbrief.ai) */
   baseUrl?: string;
   /** Override from address */
   from?: string;
@@ -53,7 +53,7 @@ export async function sendInviteEmail(opts: SendInviteOptions): Promise<SendResu
   const appUrl =
     baseUrl ??
     process.env.NEXT_PUBLIC_APP_URL ??
-    "https://paperbrief.io";
+    "https://paperbrief.ai";
 
   const inviteUrl = `${appUrl}/join?token=${encodeURIComponent(token)}`;
 

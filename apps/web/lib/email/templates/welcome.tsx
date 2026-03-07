@@ -65,7 +65,7 @@ export function WelcomeEmail({ email }: WelcomeEmailProps) {
 
           <Section style={ctaSection}>
             <Button
-              href="https://paperbrief.vercel.app"
+              href="https://paperbrief.ai"
               style={button}
             >
               Visit PaperBrief →
@@ -76,8 +76,8 @@ export function WelcomeEmail({ email }: WelcomeEmailProps) {
 
           <Text style={footer}>
             You&apos;re receiving this because you signed up at{" "}
-            <a href="https://paperbrief.vercel.app" style={link}>
-              paperbrief.vercel.app
+            <a href="https://paperbrief.ai" style={link}>
+              paperbrief.ai
             </a>
             . We won&apos;t spam you — just one email when access opens.
           </Text>
@@ -145,6 +145,9 @@ const highlightBox: React.CSSProperties = {
   borderRadius: "4px",
   margin: "0 40px 24px",
   padding: "12px 16px",
+  width: "100%",
+  boxSizing: "border-box",
+  display: "block",
 };
 
 const highlightText: React.CSSProperties = {
@@ -152,6 +155,7 @@ const highlightText: React.CSSProperties = {
   fontSize: "15px",
   lineHeight: "1.5",
   margin: "0",
+  display: "block",
 };
 
 const ctaSection: React.CSSProperties = {

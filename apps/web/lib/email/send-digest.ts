@@ -34,9 +34,9 @@ export interface SendDigestOptions {
    * Defaults to the bare /unsubscribe page (non-personalised fallback).
    */
   unsubscribeUrl?: string;
-  /** Override dashboard URL (defaults to https://paperbrief.io/dashboard) */
+  /** Override dashboard URL (defaults to https://paperbrief.ai/dashboard) */
   dashboardUrl?: string;
-  /** Override from address (defaults to digest@paperbrief.io) */
+  /** Override from address (defaults to digest@paperbrief.ai) */
   from?: string;
 }
 
