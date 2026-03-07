@@ -256,6 +256,131 @@ export function updateReadingList(arxivId: string, status: string, priority?: nu
   `).run(id, arxivId, status, priority ?? 0, now);
 }
 
+// ──────────────────────────────────────────────
+// RSS feed helpers
+// ──────────────────────────────────────────────
+
+export interface RssPaper {
+  arxiv_id: string;
+  title: string;
+  abstract: string | null;
+  published_at: string | null;
+  llm_score: number | null;
+  track: string | null;
+  authors: string | null;
+  url: string;
+}
+
+export interface TrackSummary {
+  track: string;
+  paperCount: number;
+}
+
+/**
+ * Returns recent high-scored papers suitable for an RSS feed.
+ *
+ * @param options.track    - Filter to a specific track name (exact match).
+ *                           Omit or pass undefined for all tracks.
+ * @param options.limit    - Max items to return (default 50, cap 100).
+ * @param options.daysBack - How many days back to look (default 14).
+ * @param options.minScore - Minimum llm_score to include (default 3).
+ */
+export function getRssPapers(options: {
+  track?: string;
+  limit?: number;
+  daysBack?: number;
+  minScore?: number;
+} = {}): RssPaper[] {
+  const db = getDb();
+  const { track, limit = 50, daysBack = 14, minScore = 3 } = options;
+  const cappedLimit = Math.min(limit, 100);
+
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - daysBack);
+  const fromDateStr = fromDate.toISOString().slice(0, 10);
+
+  let rows: any[];
+
+  if (track) {
+    // Filtered by a specific track — join directly against track_matches
+    rows = db.prepare(`
+      SELECT
+        p.arxiv_id,
+        p.title,
+        p.abstract,
+        p.published_at,
+        ls.relevance_score,
+        tm.track_name AS track,
+        p.authors_json
+      FROM papers p
+      JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+      JOIN track_matches tm ON tm.arxiv_id = p.arxiv_id
+      WHERE DATE(p.published_at) >= DATE(?)
+        AND ls.relevance_score >= ?
+        AND tm.track_name = ?
+      GROUP BY p.arxiv_id
+      ORDER BY ls.relevance_score DESC, p.published_at DESC
+      LIMIT ?
+    `).all(fromDateStr, minScore, track, cappedLimit) as any[];
+  } else {
+    // All tracks — pick the highest-scoring track per paper via correlated subquery
+    rows = db.prepare(`
+      SELECT
+        p.arxiv_id,
+        p.title,
+        p.abstract,
+        p.published_at,
+        ls.relevance_score,
+        (
+          SELECT tm2.track_name
+          FROM track_matches tm2
+          WHERE tm2.arxiv_id = p.arxiv_id
+          ORDER BY tm2.score DESC
+          LIMIT 1
+        ) AS track,
+        p.authors_json
+      FROM papers p
+      JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
+      WHERE DATE(p.published_at) >= DATE(?)
+        AND ls.relevance_score >= ?
+      ORDER BY ls.relevance_score DESC, p.published_at DESC
+      LIMIT ?
+    `).all(fromDateStr, minScore, cappedLimit) as any[];
+  }
+
+  return rows.map((row): RssPaper => ({
+    arxiv_id: row.arxiv_id,
+    title: row.title ?? '',
+    abstract: row.abstract ?? null,
+    published_at: row.published_at ?? null,
+    llm_score: row.relevance_score ?? null,
+    track: row.track ?? null,
+    authors: row.authors_json ?? null,
+    url: `https://arxiv.org/abs/${row.arxiv_id}`,
+  }));
+}
+
+/**
+ * Returns all tracks that have papers in the DB, with their paper counts.
+ * Useful for rendering a "choose your track feed" UI.
+ */
+export function getAvailableTracks(): TrackSummary[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      tm.track_name AS track,
+      COUNT(DISTINCT tm.arxiv_id) AS paperCount
+    FROM track_matches tm
+    GROUP BY tm.track_name
+    ORDER BY paperCount DESC
+  `).all() as any[];
+
+  return rows.map((row): TrackSummary => ({
+    track: row.track,
+    paperCount: row.paperCount,
+  }));
+}
+
 export function getRawDb(): Database.Database {
   return getDb();
 }
