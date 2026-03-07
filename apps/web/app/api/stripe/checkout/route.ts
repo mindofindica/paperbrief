@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { verifySessionCookie } from '../../../../lib/auth';
 import { getStripe, getSubscription } from '../../../../lib/stripe';
 
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const stripe = getStripe();
 
-    const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
