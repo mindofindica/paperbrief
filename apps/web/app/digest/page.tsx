@@ -73,7 +73,7 @@ export default async function DigestPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      <AppNav active="digest" />
+      <AppNav />
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
         <header>
