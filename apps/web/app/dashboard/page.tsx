@@ -39,6 +39,11 @@ export default async function DashboardPage({
   const params = await searchParams;
   const upgradeStatus = params.upgrade; // 'success' | 'cancelled' | undefined
 
+  // First-time users: redirect to onboarding (no tracks, not returning from Stripe)
+  if (tracks.length === 0 && !upgradeStatus) {
+    redirect("/onboarding");
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 px-6 py-12">
       <div className="max-w-3xl mx-auto space-y-8">
