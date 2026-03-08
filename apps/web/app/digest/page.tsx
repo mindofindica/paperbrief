@@ -1,111 +1,117 @@
 import Link from 'next/link';
-import { getTodaysPapers, getDigestDates, getAdjacentDigestDates } from '../../lib/arxiv-db';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { verifySessionCookie } from '../../lib/auth';
+import { getServiceSupabase } from '../../lib/supabase';
 import PaperCard from '../components/PaperCard';
 import AppNav from '../components/AppNav';
 
 export const dynamic = 'force-dynamic';
 
-export default function DigestPage() {
-  const papers = getTodaysPapers();
+interface DigestEntry {
+  arxiv_id: string;
+  track: string;
+  llm_score: number | null;
+  papers: {
+    title: string;
+    abstract: string | null;
+    authors: string[] | null;
+    published_at: string | null;
+  } | null;
+}
+
+export default async function DigestPage() {
+  // Auth check
+  const cookieStore = await cookies();
+  const session = cookieStore.get('pb_session')?.value;
+  const auth = session ? verifySessionCookie(session) : { valid: false };
+  if (!auth.valid) redirect('/login');
+
   const today = new Date().toISOString().slice(0, 10);
   const displayDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    timeZone: 'Europe/Amsterdam',
   });
 
-  // Get the most recent past digest date for the "← Previous" link
-  const { prev } = getAdjacentDigestDates(today);
+  const supabase = getServiceSupabase();
+  const { data: entries, error } = await supabase
+    .from('paper_digest_entries')
+    .select('arxiv_id, track, llm_score, papers(title, abstract, authors, published_at)')
+    .eq('date', today)
+    .order('llm_score', { ascending: false });
 
-  // Recent dates for the mini-history strip (up to 5, excluding today)
-  const recentDates = getDigestDates(6).filter((d) => d.date !== today).slice(0, 5);
+  if (error) console.error('[digest] Supabase error:', error.message);
+
+  const papers = ((entries ?? []) as unknown as DigestEntry[])
+    .filter(e => e.papers)
+    .map(e => ({
+      arxiv_id: e.arxiv_id,
+      title: e.papers!.title,
+      abstract: e.papers!.abstract,
+      published_at: e.papers!.published_at,
+      llm_score: e.llm_score,
+      track: e.track,
+    }));
+
+  // Group by track
+  const byTrack = papers.reduce<Record<string, typeof papers>>((acc, p) => {
+    const t = p.track ?? 'Other';
+    if (!acc[t]) acc[t] = [];
+    acc[t].push(p);
+    return acc;
+  }, {});
+
+  // Get recent dates for nav strip
+  const { data: recentEntries } = await supabase
+    .from('paper_digest_entries')
+    .select('date')
+    .lt('date', today)
+    .order('date', { ascending: false })
+    .limit(10);
+
+  const recentDates = [...new Set((recentEntries ?? []).map(e => e.date))].slice(0, 5);
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Nav */}
-      <nav className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <a href="/digest" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
-          <div className="flex gap-4 text-sm">
-            <a href="/digest" className="text-gray-100 font-medium">Digest</a>
-            <a href="/weekly" className="text-gray-500 hover:text-gray-300 transition-colors">Weekly</a>
-            <a href="/search" className="text-gray-500 hover:text-gray-300 transition-colors">Search</a>
-            <a href="/reading-list" className="text-gray-500 hover:text-gray-300 transition-colors">Reading List</a>
-          </div>
-        </div>
-      </nav>
+      <AppNav active="digest" />
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
         <header>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-100">Today&apos;s Digest</h1>
-              <p className="text-gray-500 text-sm mt-1">{today} · {papers.length} papers</p>
-            </div>
-            <a
-              href="/rss"
-              title="Subscribe via RSS"
-              className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 transition-colors border border-orange-800 hover:border-orange-600 rounded-lg px-3 py-1.5 shrink-0"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                <path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19.01 7.38 20 6.18 20C4.98 20 4 19.01 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1z"/>
-              </svg>
-              RSS
-            </a>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-100">{displayDate}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {papers.length} paper{papers.length !== 1 ? 's' : ''} across {Object.keys(byTrack).length} track{Object.keys(byTrack).length !== 1 ? 's' : ''}
+          </p>
         </header>
 
-        {/* Recent digests strip */}
+        {/* Date nav strip */}
         {recentDates.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {recentDates.map(({ date }) => (
-              <Link
-                key={date}
-                href={`/digest/${date}`}
-                className="px-3 py-1.5 text-xs rounded-lg bg-gray-900 border border-gray-800 text-gray-400 hover:text-gray-200 hover:border-gray-600 transition-colors"
-              >
-                {date}
+          <div className="flex gap-2 text-xs overflow-x-auto pb-1">
+            <span className="text-gray-400 self-center shrink-0">Recent:</span>
+            {recentDates.map(d => (
+              <Link key={d} href={`/digest/${d}`}
+                className="px-2 py-1 rounded bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors shrink-0">
+                {new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
               </Link>
             ))}
           </div>
         )}
 
         {papers.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-            <div className="text-4xl mb-4">📭</div>
-            <p className="text-gray-400">No papers yet today. Check back later!</p>
-            {prev && (
-              <Link
-                href={`/digest/${prev}`}
-                className="mt-4 inline-block text-sm text-blue-400 hover:text-blue-300 transition-colors"
-              >
-                ← View {prev}
-              </Link>
-            )}
+          <div className="text-center py-16">
+            <p className="text-gray-400">No digest available yet for today.</p>
+            <p className="text-gray-600 text-sm mt-1">Check back after 08:30 CET — the pipeline runs daily.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {papers.map((paper) => (
-              <PaperCard key={paper.arxiv_id} paper={paper} />
-            ))}
-          </div>
-        )}
-
-        {/* Bottom nav */}
-        {prev && (
-          <div className="flex justify-start pt-4 border-t border-gray-800">
-            <Link
-              href={`/digest/${prev}`}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 transition-colors group"
-            >
-              <span aria-hidden="true" className="group-hover:-translate-x-0.5 transition-transform">←</span>
-              <span>
-                <span className="text-gray-600 text-xs block">Previous digest</span>
-                {prev}
-              </span>
-            </Link>
-          </div>
+          Object.entries(byTrack).map(([track, trackPapers]) => (
+            <section key={track} className="space-y-3">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-2">
+                {track}
+              </h2>
+              {trackPapers.map(p => (
+                <PaperCard key={`${p.arxiv_id}-${track}`} paper={p} />
+              ))}
+            </section>
+          ))
         )}
       </main>
     </div>
