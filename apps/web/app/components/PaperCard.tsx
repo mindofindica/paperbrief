@@ -39,7 +39,7 @@ const EXPLANATION_LEVELS = [
   { key: 'engineer', label: 'ML Engineer ⚙️' },
 ];
 
-export default function PaperCard({ paper }: { paper: Paper }) {
+export default function PaperCard({ paper, noteCount = 0 }: { paper: Paper; noteCount?: number }) {
   const [expanded, setExpanded] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingLevel, setLoadingLevel] = useState<string | null>(null);
@@ -120,6 +120,15 @@ export default function PaperCard({ paper }: { paper: Paper }) {
           >
             arxiv →
           </a>
+          {noteCount > 0 && (
+            <a
+              href={`/papers/${paper.arxiv_id}`}
+              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50 hover:bg-amber-900/60 transition-colors"
+              title="View your notes"
+            >
+              📝 {noteCount}
+            </a>
+          )}
         </div>
       </div>
 

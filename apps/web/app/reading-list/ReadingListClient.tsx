@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PaperCard from '../components/PaperCard';
 
 interface Paper {
@@ -32,6 +32,17 @@ export default function ReadingListClient({
   done: Paper[];
 }) {
   const [activeTab, setActiveTab] = useState('all');
+  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
+
+  // Fetch note counts for all papers in the reading list
+  useEffect(() => {
+    if (all.length === 0) return;
+    const ids = all.map(p => p.arxiv_id).join(',');
+    fetch(`/api/notes/counts?arxivIds=${encodeURIComponent(ids)}`)
+      .then(res => res.ok ? res.json() : { counts: {} })
+      .then(data => setNoteCounts(data.counts ?? {}))
+      .catch(() => {}); // Non-critical — silently fail
+  }, [all]);
 
   const lists: Record<string, Paper[]> = { all, unread, reading, done };
   const items = lists[activeTab] || [];
@@ -64,7 +75,11 @@ export default function ReadingListClient({
       ) : (
         <div className="space-y-4">
           {items.map((paper) => (
-            <PaperCard key={paper.arxiv_id} paper={paper} />
+            <PaperCard
+              key={paper.arxiv_id}
+              paper={paper}
+              noteCount={noteCounts[paper.arxiv_id] ?? 0}
+            />
           ))}
         </div>
       )}

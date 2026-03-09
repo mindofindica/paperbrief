@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import NotesPanel from '../../components/NotesPanel';
 
 export interface PaperMeta {
   arxiv_id: string;
@@ -87,6 +88,9 @@ export default function PaperDetailClient({ paper, content }: Props) {
           <p className="mt-3 text-sm text-gray-600 leading-relaxed">{paper.abstract}</p>
         </details>
       )}
+
+      {/* Notes */}
+      <NotesPanel arxivId={paper.arxiv_id} />
     </div>
   );
 }
