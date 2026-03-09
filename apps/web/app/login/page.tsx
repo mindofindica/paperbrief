@@ -10,10 +10,9 @@ export default function LoginPage() {
 
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 space-y-4">
             <div className="text-5xl">🔗</div>
-            <h2 className="text-xl font-semibold">Sign in via Signal</h2>
+            <h2 className="text-xl font-semibold">Sign in via magic link</h2>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Access is invite-only via magic links sent through Signal.
-              When your daily digest is ready, you&apos;ll receive a link that logs you in automatically.
+              Access is invite-only. When your daily digest is ready, you&apos;ll receive a magic link that logs you in automatically.
             </p>
             <div className="pt-4 border-t border-gray-800">
               <p className="text-gray-500 text-xs">
