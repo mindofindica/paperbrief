@@ -15,6 +15,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '/search', label: 'Search', exact: true },
   { href: '/recommend', label: 'Recommend', exact: true },
   { href: '/reading-list', label: 'Reading List', exact: true },
+  { href: '/preview', label: 'Preview', exact: true },
 ];
 
 interface AppNavProps {
