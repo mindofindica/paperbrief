@@ -96,6 +96,19 @@ export default async function DigestPage() {
           </div>
         )}
 
+        {/* Quick links to other features */}
+        <div className="flex gap-3 flex-wrap text-xs">
+          <Link href="/preview" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
+            📬 Preview next digest
+          </Link>
+          <Link href="/gaps" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
+            🔍 Find reading gaps
+          </Link>
+          <Link href="/quiz" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
+            🧠 Take a quiz
+          </Link>
+        </div>
+
         {papers.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-400">No digest available yet for today.</p>
