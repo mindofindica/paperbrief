@@ -5,8 +5,10 @@
  * Resend is mocked — no real network calls.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Digest } from '@paperbrief/core';
+import { verifyFeedbackToken } from '../feedback-token';
+import { createElement } from 'react';
 
 // ── Mock Resend before importing the module under test ────────────────────────
 
@@ -189,5 +191,61 @@ describe('sendDigestEmail', () => {
     await sendDigestEmail({ to: 'user@example.com', digest: makeDigest() });
     const call = mockSend.mock.calls[0][0];
     expect(call).toHaveProperty('react');
+  });
+});
+
+// ── Feedback URL generation ───────────────────────────────────────────────────
+
+describe('sendDigestEmail — feedbackUrls integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.RESEND_API_KEY = 'test-resend-key-123';
+    process.env.FEEDBACK_SECRET = 'test-secret';
+  });
+
+  afterEach(() => {
+    delete process.env.FEEDBACK_SECRET;
+  });
+
+  it('passes feedbackUrls to DigestEmail when feedbackBaseUrl is provided', async () => {
+    mockSend.mockResolvedValueOnce({ data: { id: 'z' }, error: null });
+    const { DigestEmail } = await import('./templates/digest');
+    const mockedCreate = vi.mocked(createElement);
+
+    await sendDigestEmail({
+      to: 'user@example.com',
+      digest: makeDigest(),
+      feedbackBaseUrl: 'https://paperbrief.ai',
+    });
+
+    // React.createElement should have been called with feedbackUrls prop
+    const call = mockedCreate.mock.calls.find(c => c[0] === DigestEmail);
+    expect(call).toBeDefined();
+    const props = call?.[1] as Record<string, unknown>;
+    expect(props).toHaveProperty('feedbackUrls');
+    const feedbackUrls = props.feedbackUrls as Record<string, { likeUrl: string; skipUrl: string }>;
+    expect(feedbackUrls).toHaveProperty('2502.10001');
+    const fb = feedbackUrls['2502.10001'];
+    expect(fb.likeUrl).toContain('/api/feedback/email');
+    expect(fb.skipUrl).toContain('/api/feedback/email');
+    // Tokens embedded in URLs should be verifiable
+    const likeToken = new URL(fb.likeUrl).searchParams.get('token')!;
+    expect(verifyFeedbackToken(likeToken, 'user-123', '2502.10001', 'like')).toBe(true);
+  });
+
+  it('passes feedbackUrls=undefined when feedbackBaseUrl is omitted', async () => {
+    mockSend.mockResolvedValueOnce({ data: { id: 'z2' }, error: null });
+    const { DigestEmail } = await import('./templates/digest');
+    const mockedCreate = vi.mocked(createElement);
+
+    await sendDigestEmail({
+      to: 'user@example.com',
+      digest: makeDigest(),
+      // No feedbackBaseUrl
+    });
+
+    const call = mockedCreate.mock.calls.find(c => c[0] === DigestEmail);
+    const props = call?.[1] as Record<string, unknown>;
+    expect(props.feedbackUrls).toBeUndefined();
   });
 });

@@ -14,6 +14,8 @@ import {
   Hr,
   Html,
   Preview,
+  Row,
+  Column,
   Section,
   Text,
 } from "@react-email/components";
@@ -24,6 +26,15 @@ interface DigestEmailProps {
   digest: Digest;
   unsubscribeUrl?: string;
   dashboardUrl?: string;
+  /**
+   * Base URL used to build per-paper 👍/👎 feedback links.
+   * If omitted, feedback buttons are hidden (safe fallback).
+   * Build with buildLikeUrl / buildSkipUrl from lib/feedback-token.ts.
+   *
+   * Expected shape per entry:
+   *   feedbackUrls[arxivId] = { likeUrl: string; skipUrl: string }
+   */
+  feedbackUrls?: Record<string, { likeUrl: string; skipUrl: string }>;
 }
 
 // ── Score → visual representation ────────────────────────────────────────────
@@ -42,12 +53,22 @@ function scoreBadge(score: number): { label: string; color: string; bg: string }
 
 // ── Paper card component ──────────────────────────────────────────────────────
 
-function PaperCard({ entry }: { entry: DigestEntry }) {
+function PaperCard({
+  entry,
+  likeUrl,
+  skipUrl,
+}: {
+  entry: DigestEntry;
+  likeUrl?: string;
+  skipUrl?: string;
+}) {
   const badge = scoreBadge(entry.score);
   const excerpt =
     entry.summary.length > 200
       ? entry.summary.slice(0, 197) + "…"
       : entry.summary;
+
+  const showFeedback = Boolean(likeUrl && skipUrl);
 
   return (
     <Section style={cardStyle}>
@@ -70,10 +91,29 @@ function PaperCard({ entry }: { entry: DigestEntry }) {
         <Text style={cardReason}>Why this matters: {entry.reason}</Text>
       ) : null}
 
-      {/* CTA */}
-      <Button href={entry.absUrl} style={paperButton}>
-        Read on arXiv →
-      </Button>
+      {/* CTA row: arXiv link + optional feedback buttons */}
+      {showFeedback ? (
+        <Row style={ctaRowStyle}>
+          <Column style={ctaArxivCol}>
+            <Button href={entry.absUrl} style={paperButton}>
+              Read on arXiv →
+            </Button>
+          </Column>
+          <Column style={ctaFeedbackCol}>
+            <Button href={likeUrl} style={feedbackLikeButton}>
+              👍 Useful
+            </Button>
+            &nbsp;
+            <Button href={skipUrl} style={feedbackSkipButton}>
+              👎 Skip
+            </Button>
+          </Column>
+        </Row>
+      ) : (
+        <Button href={entry.absUrl} style={paperButton}>
+          Read on arXiv →
+        </Button>
+      )}
     </Section>
   );
 }
@@ -83,16 +123,26 @@ function PaperCard({ entry }: { entry: DigestEntry }) {
 function TrackSection({
   trackName,
   entries,
+  feedbackUrls,
 }: {
   trackName: string;
   entries: DigestEntry[];
+  feedbackUrls?: Record<string, { likeUrl: string; skipUrl: string }>;
 }) {
   return (
     <Section style={trackSectionStyle}>
       <Heading style={trackHeading}>{trackName}</Heading>
-      {entries.map((e) => (
-        <PaperCard key={e.arxivId} entry={e} />
-      ))}
+      {entries.map((e) => {
+        const fb = feedbackUrls?.[e.arxivId];
+        return (
+          <PaperCard
+            key={e.arxivId}
+            entry={e}
+            likeUrl={fb?.likeUrl}
+            skipUrl={fb?.skipUrl}
+          />
+        );
+      })}
     </Section>
   );
 }
@@ -103,6 +153,7 @@ export function DigestEmail({
   digest,
   unsubscribeUrl = "https://paperbrief.ai/unsubscribe",
   dashboardUrl = "https://paperbrief.ai/dashboard",
+  feedbackUrls,
 }: DigestEmailProps) {
   // Group entries by track
   const byTrack = new Map<string, DigestEntry[]>();
@@ -140,7 +191,12 @@ export function DigestEmail({
 
           {/* Track sections */}
           {[...byTrack.entries()].map(([trackName, entries]) => (
-            <TrackSection key={trackName} trackName={trackName} entries={entries} />
+            <TrackSection
+              key={trackName}
+              trackName={trackName}
+              entries={entries}
+              feedbackUrls={feedbackUrls}
+            />
           ))}
 
           {/* Footer CTA */}
@@ -283,6 +339,43 @@ const paperButton: React.CSSProperties = {
   borderRadius: "6px",
   textDecoration: "none",
   display: "inline-block",
+};
+
+const ctaRowStyle: React.CSSProperties = {
+  width: "100%",
+};
+
+const ctaArxivCol: React.CSSProperties = {
+  verticalAlign: "middle",
+};
+
+const ctaFeedbackCol: React.CSSProperties = {
+  textAlign: "right",
+  verticalAlign: "middle",
+};
+
+const feedbackLikeButton: React.CSSProperties = {
+  backgroundColor: "#d1fae5",
+  color: "#065f46",
+  fontSize: "11px",
+  fontWeight: "600",
+  padding: "5px 10px",
+  borderRadius: "6px",
+  textDecoration: "none",
+  display: "inline-block",
+  border: "1px solid #6ee7b7",
+};
+
+const feedbackSkipButton: React.CSSProperties = {
+  backgroundColor: "#f3f4f6",
+  color: "#374151",
+  fontSize: "11px",
+  fontWeight: "600",
+  padding: "5px 10px",
+  borderRadius: "6px",
+  textDecoration: "none",
+  display: "inline-block",
+  border: "1px solid #d1d5db",
 };
 
 const ctaSection: React.CSSProperties = {

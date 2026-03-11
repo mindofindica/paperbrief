@@ -7,6 +7,7 @@
 import { Resend } from "resend";
 import * as React from "react";
 import { DigestEmail } from "./templates/digest";
+import { buildLikeUrl, buildSkipUrl } from "../feedback-token";
 import type { Digest } from "@paperbrief/core";
 
 export type SendResult =
@@ -36,8 +37,16 @@ export interface SendDigestOptions {
   unsubscribeUrl?: string;
   /** Override dashboard URL (defaults to https://paperbrief.ai/dashboard) */
   dashboardUrl?: string;
-  /** Override from address (defaults to digest@paperbrief.ai) */
+  /** Override from address (defaults to hello@paperbrief.ai) */
   from?: string;
+  /**
+   * Base URL for building per-paper 👍/👎 feedback links.
+   * Required to embed feedback buttons in the email.
+   * When omitted, feedback buttons are hidden (safe fallback for back-compat).
+   *
+   * Typically: process.env.NEXT_PUBLIC_APP_URL or "https://paperbrief.ai"
+   */
+  feedbackBaseUrl?: string;
 }
 
 /**
@@ -47,7 +56,7 @@ export interface SendDigestOptions {
  * local dev / CI where the key isn't present.
  */
 export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResult> {
-  const { to, digest, unsubscribeUrl, dashboardUrl, from } = opts;
+  const { to, digest, unsubscribeUrl, dashboardUrl, from, feedbackBaseUrl } = opts;
 
   const resend = getResendClient();
   if (!resend) {
@@ -64,6 +73,9 @@ export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResu
     return { ok: false, error: "Digest is empty", skipped: true };
   }
 
+  // Build per-paper feedback URLs if we have a userId and base URL
+  const feedbackUrls = buildFeedbackUrls(digest.userId, digest.entries, feedbackBaseUrl);
+
   const subject = buildSubject(digest);
 
   try {
@@ -75,6 +87,7 @@ export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResu
         digest,
         unsubscribeUrl,
         dashboardUrl,
+        feedbackUrls,
       }),
     });
 
@@ -90,6 +103,28 @@ export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResu
     console.error("[email] Unexpected error (digest):", message);
     return { ok: false, error: message };
   }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Build a feedbackUrls map for all entries in the digest.
+ * Returns undefined when userId or feedbackBaseUrl is missing (buttons hidden).
+ */
+function buildFeedbackUrls(
+  userId: string,
+  entries: Array<{ arxivId: string }>,
+  feedbackBaseUrl?: string
+): Record<string, { likeUrl: string; skipUrl: string }> | undefined {
+  if (!userId || !feedbackBaseUrl) return undefined;
+  const urls: Record<string, { likeUrl: string; skipUrl: string }> = {};
+  for (const entry of entries) {
+    urls[entry.arxivId] = {
+      likeUrl: buildLikeUrl(userId, entry.arxivId, feedbackBaseUrl),
+      skipUrl: buildSkipUrl(userId, entry.arxivId, feedbackBaseUrl),
+    };
+  }
+  return urls;
 }
 
 /**
