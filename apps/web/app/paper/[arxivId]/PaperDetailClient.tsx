@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Paper } from '../../../lib/arxiv-db';
 
 const TRACK_COLORS: Record<string, string> = {
@@ -30,6 +30,19 @@ const EXPLANATION_LEVELS = [
   { key: 'engineer', label: 'ML Engineer' },
 ];
 
+const STARTER_QUESTIONS = [
+  'What problem does this solve?',
+  'How does the method work?',
+  'What are the key results?',
+  'What are the limitations?',
+  'How does this compare to GPT-4?',
+];
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 function formatDate(value: string | null): string {
   if (!value) return 'Unknown date';
   const date = new Date(value);
@@ -53,6 +66,256 @@ function parseAuthors(authorsJson: string | null): string {
   }
   return authorsJson;
 }
+
+// ── Chat Panel ─────────────────────────────────────────────────────────────────
+
+function ChatPanel({ arxivId }: { arxivId: string }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [streaming, setStreaming] = useState(false);
+  const [isPro, setIsPro] = useState<boolean | null>(null); // null = loading
+  const [proCheckError, setProCheckError] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Check Pro status on mount by attempting a GET on chat history
+  useEffect(() => {
+    let mounted = true;
+    async function checkPlan() {
+      try {
+        const res = await fetch(`/api/paper/${encodeURIComponent(arxivId)}/chat`);
+        if (!mounted) return;
+        if (res.status === 401) { setIsPro(false); return; } // not logged in → treat as free
+        if (res.status === 403) { setIsPro(false); return; } // free plan
+        if (res.ok) {
+          const data = await res.json();
+          setIsPro(true);
+          // Restore previous conversation if any
+          if (data.messages?.length) {
+            setMessages(data.messages.map((m: { role: string; content: string }) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            })));
+          }
+        } else {
+          setProCheckError(true);
+        }
+      } catch {
+        if (mounted) setProCheckError(true);
+      }
+    }
+    checkPlan();
+    return () => { mounted = false; };
+  }, [arxivId]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  async function sendMessage(question?: string) {
+    const text = (question ?? input).trim();
+    if (!text || streaming) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: text };
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setInput('');
+    setStreaming(true);
+
+    // Optimistic empty assistant turn
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
+
+    try {
+      const res = await fetch(`/api/paper/${encodeURIComponent(arxivId)}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedMessages }),
+      });
+
+      if (res.status === 403) {
+        setIsPro(false);
+        setMessages((prev) => prev.slice(0, -1)); // remove optimistic assistant turn
+        return;
+      }
+
+      if (!res.ok || !res.body) {
+        setMessages((prev) => [
+          ...prev.slice(0, -1),
+          { role: 'assistant', content: 'Something went wrong. Please try again.' },
+        ]);
+        return;
+      }
+
+      // Stream SSE response
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            if (typeof json.delta === 'string') {
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                if (last?.role !== 'assistant') return prev;
+                return [...prev.slice(0, -1), { role: 'assistant', content: last.content + json.delta }];
+              });
+            }
+          } catch {
+            // Malformed — skip
+          }
+        }
+      }
+    } catch {
+      setMessages((prev) => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: 'Network error. Please try again.' },
+      ]);
+    } finally {
+      setStreaming(false);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ── Locked UI (free plan) ────────────────────────────────────────────────────
+  if (isPro === false) {
+    return (
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center space-y-3">
+        <div className="text-3xl">💬</div>
+        <h3 className="text-base font-semibold text-gray-100">Paper Chat</h3>
+        <p className="text-sm text-gray-400 leading-relaxed max-w-xs mx-auto">
+          Ask anything about this paper — methods, results, equations, comparisons.
+          Conversational AI that knows the paper inside out.
+        </p>
+        <div className="flex flex-col gap-2 text-xs text-gray-600 items-center">
+          {STARTER_QUESTIONS.slice(0, 3).map((q) => (
+            <span key={q} className="px-3 py-1.5 rounded-lg bg-gray-800/60 text-gray-500 italic">"{q}"</span>
+          ))}
+        </div>
+        <a
+          href="/pricing"
+          className="inline-block mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          Upgrade to Pro — $12/mo
+        </a>
+      </div>
+    );
+  }
+
+  // ── Loading state ────────────────────────────────────────────────────────────
+  if (isPro === null && !proCheckError) {
+    return (
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 flex items-center justify-center h-24">
+        <span className="text-gray-600 text-sm animate-pulse">Loading chat…</span>
+      </div>
+    );
+  }
+
+  // ── Active chat UI ───────────────────────────────────────────────────────────
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="px-5 py-3 border-b border-gray-800 flex items-center gap-2">
+        <span className="text-sm font-semibold text-gray-100">💬 Paper Chat</span>
+        <span className="text-xs px-2 py-0.5 bg-blue-900/50 text-blue-300 rounded-full font-medium">Pro</span>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto max-h-96 p-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">Ask anything about this paper:</p>
+            <div className="flex flex-col gap-1.5">
+              {STARTER_QUESTIONS.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => sendMessage(q)}
+                  disabled={streaming}
+                  className="text-left text-xs text-gray-400 hover:text-gray-200 px-3 py-2 rounded-lg bg-gray-800/50 hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[85%] text-sm rounded-xl px-4 py-2.5 leading-relaxed whitespace-pre-wrap ${
+                msg.role === 'user'
+                  ? 'bg-blue-900/50 text-blue-100'
+                  : 'bg-gray-800 text-gray-200'
+              }`}
+            >
+              {msg.content || (streaming && i === messages.length - 1 ? (
+                <span className="inline-flex gap-1">
+                  <span className="animate-bounce delay-0">·</span>
+                  <span className="animate-bounce delay-100">·</span>
+                  <span className="animate-bounce delay-200">·</span>
+                </span>
+              ) : '')}
+            </div>
+          </div>
+        ))}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-gray-800 p-3 flex gap-2 items-end">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={streaming}
+          placeholder="Ask about this paper… (Enter to send)"
+          rows={2}
+          maxLength={1000}
+          className="flex-1 bg-gray-800 text-gray-100 placeholder-gray-600 text-sm rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-700 disabled:opacity-50"
+        />
+        <button
+          onClick={() => sendMessage()}
+          disabled={!input.trim() || streaming}
+          className="px-3 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-lg transition-colors"
+          aria-label="Send message"
+        >
+          {streaming ? '…' : '↑'}
+        </button>
+      </div>
+
+      {messages.length > 0 && (
+        <div className="px-4 pb-2 text-xs text-gray-600">
+          {messages.filter((m) => m.role === 'user').length} / 10 messages used
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PaperDetailClient({ paper }: { paper: Paper }) {
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -219,6 +482,12 @@ export default function PaperDetailClient({ paper }: { paper: Paper }) {
               {explanation}
             </div>
           )}
+        </section>
+
+        {/* ── Paper Chat (Pro) ── */}
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-100">Ask this paper</h2>
+          <ChatPanel arxivId={paper.arxiv_id} />
         </section>
 
         <section className="space-y-3">
