@@ -53,7 +53,8 @@ END;
 $$;
 
 -- get_trending_papers (defined in 20260311000002_trending_papers.sql)
--- Re-create with search_path hardened
+-- Re-create with search_path hardened (DROP first to allow return type change)
+DROP FUNCTION IF EXISTS get_trending_papers(INT, INT);
 CREATE OR REPLACE FUNCTION get_trending_papers(
   days INT DEFAULT 7,
   lim  INT DEFAULT 20
