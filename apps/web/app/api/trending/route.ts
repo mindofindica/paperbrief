@@ -69,8 +69,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const { data, error } = await supabase.rpc('get_trending_papers', {
-    days_back:   days,
-    max_results: limit,
+    days: days,
+    lim: limit,
   });
 
   if (error) {

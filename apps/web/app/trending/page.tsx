@@ -62,8 +62,8 @@ async function fetchTrendingPapers(days = 7, limit = 20): Promise<TrendingRespon
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { data, error } = await supabase.rpc('get_trending_papers', {
-      days_back:   days,
-      max_results: limit,
+      days: days,
+      lim: limit,
     });
 
     if (error) {
