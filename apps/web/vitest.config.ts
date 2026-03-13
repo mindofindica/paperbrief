@@ -2,6 +2,10 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
+  esbuild: {
+    // Use React 17+ automatic JSX transform so .tsx files don't need `import React`
+    jsx: 'automatic',
+  },
   test: {
     globals: false,
     environment: 'node',

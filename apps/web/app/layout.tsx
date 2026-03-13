@@ -11,7 +11,24 @@ export const metadata: Metadata = {
     title: "PaperBrief — Stop drowning in arxiv",
     description:
       "Your personal research radar. Weekly digest of the ML papers that matter to your work.",
+    url: SITE_URL,
+    siteName: "PaperBrief",
     type: "website",
+    images: [
+      {
+        url: `${SITE_URL}/opengraph-image`,
+        width: 1200,
+        height: 630,
+        alt: "PaperBrief — Your personal ML research digest",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PaperBrief — Stop drowning in arXiv",
+    description:
+      "Your personal research radar. Weekly digest of the ML papers that matter to your work.",
+    images: [`${SITE_URL}/opengraph-image`],
   },
   // Auto-discovery: RSS readers pick this up automatically
   alternates: {
