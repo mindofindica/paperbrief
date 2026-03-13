@@ -814,6 +814,40 @@ export function getRawDb(): Database.Database {
   return getDb();
 }
 
+export interface SitemapPaper {
+  arxiv_id: string;
+  published_at: string | null;
+  updated_at: string | null;
+}
+
+/**
+ * Returns paper IDs and dates for sitemap generation.
+ * Scoped to scored papers from the last `daysBack` days (default 180).
+ * Capped at `limit` rows (default 5000) to keep the sitemap manageable.
+ */
+export function getSitemapPapers(
+  daysBack = 180,
+  limit = 5000,
+): SitemapPaper[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `
+      SELECT p.arxiv_id,
+             p.published_at,
+             p.published_at AS updated_at
+      FROM papers p
+      JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+      WHERE ls.relevance_score IS NOT NULL
+        AND p.published_at >= DATE('now', ? || ' days')
+      ORDER BY p.published_at DESC
+      LIMIT ?
+    `,
+    )
+    .all(`-${daysBack}`, limit) as SitemapPaper[];
+  return rows;
+}
+
 export function closeDb(): void {
   if (_db) {
     _db.close();
