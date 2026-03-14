@@ -39,7 +39,7 @@ export async function GET(
   }
 
   // Generate via OpenRouter
-  const paper = getPaper(arxivId);
+  const paper = await getPaper(arxivId);
   if (!paper) {
     return NextResponse.json({ error: 'Paper not found' }, { status: 404 });
   }

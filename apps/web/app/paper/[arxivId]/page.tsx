@@ -9,7 +9,7 @@ export default async function PaperDetailPage({
   params: Promise<{ arxivId: string }>;
 }) {
   const { arxivId } = await params;
-  const paper = getPaper(arxivId);
+  const paper = await getPaper(arxivId);
 
   if (!paper) {
     return (

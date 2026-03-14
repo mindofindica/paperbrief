@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
+import { getServiceSupabase } from './supabase';
 
 let _db: Database.Database | null = null;
 
@@ -7,13 +8,18 @@ function getDbPath(): string {
   return process.env.ARXIV_COACH_DB_PATH || '/root/.openclaw/state/arxiv-coach/db.sqlite';
 }
 
-function getDb(): Database.Database {
-  if (!_db) {
-    _db = new Database(getDbPath(), { readonly: false });
+function getDb(): Database.Database | null {
+  if (_db) return _db;
+  const dbPath = getDbPath();
+  try {
+    _db = new Database(dbPath, { readonly: false });
     _db.pragma('journal_mode = WAL');
     _db.pragma('foreign_keys = ON');
+    return _db;
+  } catch {
+    // DB not available (e.g. Vercel serverless — use Supabase instead)
+    return null;
   }
-  return _db;
 }
 
 export interface Paper {
@@ -63,6 +69,13 @@ function buildFtsQuery(rawQuery: string): string {
   return tokens.map((t) => `"${t}"`).join(' ');
 }
 
+// Throws if local SQLite is unavailable (Vercel). Sync functions require the DB.
+function requireDb(): Database.Database {
+  const db = getDb();
+  if (!db) throw new Error('Local SQLite DB unavailable in this environment');
+  return db;
+}
+
 // Map real schema → normalised Paper shape
 function rowToPaper(row: any): Paper {
   return {
@@ -78,7 +91,7 @@ function rowToPaper(row: any): Paper {
 }
 
 export function getTodaysPapers(): Paper[] {
-  const db = getDb();
+  const db = requireDb();
   const today = new Date().toISOString().slice(0, 10);
 
   // Try to get papers from today's sent digest first
@@ -113,7 +126,7 @@ export function getTodaysPapers(): Paper[] {
 }
 
 export function searchPapers(options: SearchPapersOptions): Paper[] {
-  const db = getDb();
+  const db = requireDb();
   const trimmedQuery = options.query.trim();
   if (!trimmedQuery) return [];
 
@@ -175,20 +188,57 @@ export function searchPapers(options: SearchPapersOptions): Paper[] {
   return rows.map(rowToPaper);
 }
 
-export function getPaper(arxivId: string): Paper | undefined {
+export async function getPaper(arxivId: string): Promise<Paper | undefined> {
+  // Try local SQLite first (dev / VPS), fall back to Supabase (Vercel)
   const db = getDb();
-  const row = db.prepare(`
-    SELECT p.*, ls.relevance_score,
-           (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track
-    FROM papers p
-    LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
-    WHERE p.arxiv_id = ?
-  `).get(arxivId) as any;
-  return row ? rowToPaper(row) : undefined;
+  if (db) {
+    try {
+      const row = db.prepare(`
+        SELECT p.*, ls.relevance_score,
+               (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track
+        FROM papers p
+        LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
+        WHERE p.arxiv_id = ?
+      `).get(arxivId) as any;
+      if (row) return rowToPaper(row);
+    } catch {
+      // fall through to Supabase
+    }
+  }
+
+  // Supabase path — used on Vercel where local SQLite is unavailable
+  try {
+    const supabase = getServiceSupabase();
+    const [paperRes, digestRes] = await Promise.all([
+      supabase.from('papers').select('*').eq('arxiv_id', arxivId).single(),
+      supabase
+        .from('paper_digest_entries')
+        .select('track, llm_score')
+        .eq('arxiv_id', arxivId)
+        .order('llm_score', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (!paperRes.data) return undefined;
+    const p = paperRes.data;
+    const digest = digestRes.data;
+    return {
+      arxiv_id: p.arxiv_id,
+      title: p.title,
+      abstract: p.abstract ?? null,
+      published_at: p.published_at ?? null,
+      llm_score: digest?.llm_score ?? null,
+      track: digest?.track ?? null,
+      authors: Array.isArray(p.authors) ? JSON.stringify(p.authors) : (p.authors ?? null),
+      url: `https://arxiv.org/abs/${p.arxiv_id}`,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function getReadingList(status?: string): ReadingListEntry[] {
-  const db = getDb();
+  const db = requireDb();
   const where = status && status !== 'all' ? `WHERE r.status = ?` : '';
   const params = status && status !== 'all' ? [status] : [];
 
@@ -213,7 +263,7 @@ export function getReadingList(status?: string): ReadingListEntry[] {
 }
 
 export function writeFeedback(arxivId: string, action: string): void {
-  const db = getDb();
+  const db = requireDb();
   const id = randomUUID();
   const now = new Date().toISOString();
 
@@ -246,7 +296,7 @@ export function writeFeedback(arxivId: string, action: string): void {
 }
 
 export function updateReadingList(arxivId: string, status: string, priority?: number): void {
-  const db = getDb();
+  const db = requireDb();
   const id = randomUUID();
   const now = new Date().toISOString();
   db.prepare(`
@@ -332,7 +382,7 @@ export function extractTitleKeywords(title: string): string[] {
  * Falls back to track_matches if digest_papers is sparse.
  */
 export function getWeeklyPapers(): WeeklyTrackSection[] {
-  const db = getDb();
+  const db = requireDb();
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
@@ -391,7 +441,7 @@ export function getRssPapers(options: {
   daysBack?: number;
   minScore?: number;
 } = {}): RssPaper[] {
-  const db = getDb();
+  const db = requireDb();
   const { track, limit = 50, daysBack = 14, minScore = 3 } = options;
   const cappedLimit = Math.min(limit, 100);
 
@@ -465,7 +515,7 @@ export function getRssPapers(options: {
  * Falls back to dates with scored papers if sent_digests is empty.
  */
 export function getDigestDates(limit = 30): DigestDate[] {
-  const db = getDb();
+  const db = requireDb();
 
   // Primary: dates from sent_digests (official email sends)
   const fromDigests = db.prepare(`
@@ -506,7 +556,7 @@ export function getDigestDates(limit = 30): DigestDate[] {
  * Useful for rendering a "choose your track feed" UI.
  */
 export function getAvailableTracks(): TrackSummary[] {
-  const db = getDb();
+  const db = requireDb();
   const rows = db.prepare(`
     SELECT
       tm.track_name AS track,
@@ -529,7 +579,7 @@ export function getAvailableTracks(): TrackSummary[] {
  */
 export function getPapersByDate(date: string, limit = 30): Paper[] {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
-  const db = getDb();
+  const db = requireDb();
 
   // Try digest_papers first (old weekly format with curated 5 papers)
   const fromDigestPapers = db.prepare(`
@@ -566,7 +616,7 @@ export function getPapersByDate(date: string, limit = 30): Paper[] {
  */
 export function getAdjacentDigestDates(date: string): { prev: string | null; next: string | null } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { prev: null, next: null };
-  const db = getDb();
+  const db = requireDb();
 
   const prevRow = db.prepare(`
     SELECT digest_date FROM sent_digests
@@ -589,7 +639,7 @@ export function getAdjacentDigestDates(date: string): { prev: string | null; nex
 }
 
 export function removeFromReadingList(arxivId: string): void {
-  const db = getDb();
+  const db = requireDb();
   db.prepare(`
     DELETE FROM reading_list
     WHERE paper_id = ?
@@ -597,7 +647,7 @@ export function removeFromReadingList(arxivId: string): void {
 }
 
 export function getRecommendationBasis(): 'your feedback' | 'top papers' {
-  const db = getDb();
+  const db = requireDb();
   const row = db.prepare(`
     SELECT 1
     FROM paper_feedback
@@ -609,7 +659,7 @@ export function getRecommendationBasis(): 'your feedback' | 'top papers' {
 }
 
 export function getRecommendations(limit = 20): Paper[] {
-  const db = getDb();
+  const db = requireDb();
   const safeLimit = Math.min(Math.max(1, Math.trunc(limit)), 100);
   const basedOnFeedback = getRecommendationBasis() === 'your feedback';
 
@@ -688,7 +738,7 @@ export function getRecommendations(limit = 20): Paper[] {
  * Returns summary stats for the past 7 days.
  */
 export function getWeeklyStats(): WeeklyStats {
-  const db = getDb();
+  const db = requireDb();
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const fromDate = sevenDaysAgo.toISOString().slice(0, 10);
@@ -732,7 +782,7 @@ export function getWeeklyStats(): WeeklyStats {
  * Returns top trending keywords with direction and % change.
  */
 export function getWeeklyKeywordTrends(limit = 15): WeeklyKeyword[] {
-  const db = getDb();
+  const db = requireDb();
   const now = new Date();
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(now.getDate() - 7);

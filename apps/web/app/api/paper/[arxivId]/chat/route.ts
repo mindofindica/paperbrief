@@ -113,7 +113,7 @@ export async function POST(
   const persist = body.persist !== false; // default: save to history
 
   // ── Paper lookup ──────────────────────────────────────────────────────────────
-  const paper = getPaper(arxivId);
+  const paper = await getPaper(arxivId);
   if (!paper) {
     return NextResponse.json({ error: 'paper_not_found' }, { status: 404 });
   }

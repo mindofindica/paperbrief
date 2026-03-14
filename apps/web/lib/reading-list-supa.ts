@@ -57,22 +57,25 @@ export async function getUserReadingList(
   const { data, error } = await query;
   if (error) throw new Error(`[reading-list-supa] fetch error: ${error.message}`);
 
-  return (data ?? []).map((row) => {
-    const paper = row.arxiv_id ? getPaper(row.arxiv_id) : null;
-    return {
-      arxiv_id: row.arxiv_id as string,
-      title: paper?.title ?? row.arxiv_id ?? 'Unknown paper',
-      abstract: paper?.abstract ?? null,
-      authors: paper?.authors ?? null,
-      track: paper?.track ?? null,
-      llm_score: paper?.llm_score ?? null,
-      published_at: paper?.published_at ?? null,
-      status: (row.status ?? 'unread') as ReadingStatus,
-      priority: row.priority ?? 0,
-      note: row.note ?? null,
-      saved_at: row.saved_at as string,
-    };
-  });
+  const entries = await Promise.all(
+    (data ?? []).map(async (row) => {
+      const paper = row.arxiv_id ? await getPaper(row.arxiv_id) : null;
+      return {
+        arxiv_id: row.arxiv_id as string,
+        title: paper?.title ?? row.arxiv_id ?? 'Unknown paper',
+        abstract: paper?.abstract ?? null,
+        authors: paper?.authors ?? null,
+        track: paper?.track ?? null,
+        llm_score: paper?.llm_score ?? null,
+        published_at: paper?.published_at ?? null,
+        status: (row.status ?? 'unread') as ReadingStatus,
+        priority: row.priority ?? 0,
+        note: row.note ?? null,
+        saved_at: row.saved_at as string,
+      };
+    })
+  );
+  return entries;
 }
 
 /**
