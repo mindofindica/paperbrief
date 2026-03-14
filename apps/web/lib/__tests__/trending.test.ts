@@ -74,16 +74,16 @@ describe('GET /api/trending — parameter parsing', () => {
   it('uses defaults (days=7, limit=20) when no params given', async () => {
     await GET(makeRequest() as any);
     expect(mockRpc).toHaveBeenCalledWith('get_trending_papers', {
-      days_back:   7,
-      max_results: 20,
+      days:   7,
+      lim: 20,
     });
   });
 
   it('passes custom days and limit', async () => {
     await GET(makeRequest({ days: '14', limit: '10' }) as any);
     expect(mockRpc).toHaveBeenCalledWith('get_trending_papers', {
-      days_back:   14,
-      max_results: 10,
+      days:   14,
+      lim: 10,
     });
   });
 
@@ -91,7 +91,7 @@ describe('GET /api/trending — parameter parsing', () => {
     await GET(makeRequest({ days: '999' }) as any);
     expect(mockRpc).toHaveBeenCalledWith(
       'get_trending_papers',
-      expect.objectContaining({ days_back: 30 })
+      expect.objectContaining({ days: 30 })
     );
   });
 
@@ -99,7 +99,7 @@ describe('GET /api/trending — parameter parsing', () => {
     await GET(makeRequest({ days: '0' }) as any);
     expect(mockRpc).toHaveBeenCalledWith(
       'get_trending_papers',
-      expect.objectContaining({ days_back: 1 })
+      expect.objectContaining({ days: 1 })
     );
   });
 
@@ -107,7 +107,7 @@ describe('GET /api/trending — parameter parsing', () => {
     await GET(makeRequest({ limit: '500' }) as any);
     expect(mockRpc).toHaveBeenCalledWith(
       'get_trending_papers',
-      expect.objectContaining({ max_results: 50 })
+      expect.objectContaining({ lim: 50 })
     );
   });
 
@@ -115,7 +115,7 @@ describe('GET /api/trending — parameter parsing', () => {
     await GET(makeRequest({ limit: '-5' }) as any);
     expect(mockRpc).toHaveBeenCalledWith(
       'get_trending_papers',
-      expect.objectContaining({ max_results: 1 })
+      expect.objectContaining({ lim: 1 })
     );
   });
 
@@ -123,7 +123,7 @@ describe('GET /api/trending — parameter parsing', () => {
     await GET(makeRequest({ days: 'abc' }) as any);
     expect(mockRpc).toHaveBeenCalledWith(
       'get_trending_papers',
-      expect.objectContaining({ days_back: 7 })
+      expect.objectContaining({ days: 7 })
     );
   });
 
@@ -131,7 +131,7 @@ describe('GET /api/trending — parameter parsing', () => {
     await GET(makeRequest({ days: '7.9' }) as any);
     expect(mockRpc).toHaveBeenCalledWith(
       'get_trending_papers',
-      expect.objectContaining({ days_back: 7 })
+      expect.objectContaining({ days: 7 })
     );
   });
 });
