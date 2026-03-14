@@ -334,6 +334,92 @@ describe('POST /api/paper/[arxivId]/chat', () => {
     expect(systemMsg?.content).toContain('We propose the Transformer');
   });
 
+  // ── System prompt quality ─────────────────────────────────────────────────────
+
+  async function getSystemPrompt(): Promise<string> {
+    proAuth();
+    mockGetPaper.mockReturnValue(MOCK_PAPER as never);
+    mockGetSupa.mockReturnValue(makeSupaMock());
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    mockOpenRouter(sseChunks(['ok']));
+    const req = makeRequest('POST', { messages: [{ role: 'user', content: 'test' }] });
+    await POST(req, { params: PARAMS });
+    const body = JSON.parse((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    return body.messages.find((m: { role: string }) => m.role === 'system')?.content ?? '';
+  }
+
+  it('covers all arXiv fields — not just ML/CS', async () => {
+    const prompt = await getSystemPrompt();
+    // Should mention broad fields, not narrow to ML/CS only
+    expect(prompt).toMatch(/physics|mathematics|biology|economics/i);
+  });
+
+  it('instructs the model to lead with the direct answer', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/lead with the direct answer/i);
+  });
+
+  it('instructs the model to explain technical jargon', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/jargon|technical terms/i);
+  });
+
+  it('includes type-specific guidance for contribution questions', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/contribution|novelty/i);
+  });
+
+  it('includes type-specific guidance for methodology questions', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/methodology|approach/i);
+  });
+
+  it('includes type-specific guidance for limitations questions', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/limitation/i);
+  });
+
+  it('includes the paper category in the system prompt', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toContain('cs.CL'); // MOCK_PAPER.track
+  });
+
+  it('instructs the model not to fabricate results', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/fabricate|never fabricate/i);
+  });
+
+  it('acknowledges the abstract-only limitation', async () => {
+    const prompt = await getSystemPrompt();
+    expect(prompt).toMatch(/abstract only|abstract\s+only|NOT the full/i);
+  });
+
+  it('uses "No abstract available." fallback when abstract is null', async () => {
+    proAuth();
+    mockGetPaper.mockReturnValue({ ...MOCK_PAPER, abstract: null } as never);
+    mockGetSupa.mockReturnValue(makeSupaMock());
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    mockOpenRouter(sseChunks(['ok']));
+    const req = makeRequest('POST', { messages: [{ role: 'user', content: 'test' }] });
+    await POST(req, { params: PARAMS });
+    const body = JSON.parse((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    const systemMsg = body.messages.find((m: { role: string }) => m.role === 'system')?.content ?? '';
+    expect(systemMsg).toContain('No abstract available.');
+  });
+
+  it('uses "Unknown" category fallback when track is null', async () => {
+    proAuth();
+    mockGetPaper.mockReturnValue({ ...MOCK_PAPER, track: null } as never);
+    mockGetSupa.mockReturnValue(makeSupaMock());
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    mockOpenRouter(sseChunks(['ok']));
+    const req = makeRequest('POST', { messages: [{ role: 'user', content: 'test' }] });
+    await POST(req, { params: PARAMS });
+    const body = JSON.parse((global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    const systemMsg = body.messages.find((m: { role: string }) => m.role === 'system')?.content ?? '';
+    expect(systemMsg).toContain('Unknown');
+  });
+
   it('returns 502 when OpenRouter responds with non-OK status', async () => {
     proAuth();
     mockGetPaper.mockReturnValue(MOCK_PAPER as never);
