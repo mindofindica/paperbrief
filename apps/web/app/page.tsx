@@ -5,6 +5,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import WaitlistForm from "./components/WaitlistForm";
+import SampleDigest from "./components/SampleDigest";
 
 export const revalidate = 3600; // ISR: revalidate waitlist count every hour
 
@@ -126,6 +127,9 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Sample Digest ── */}
+      <SampleDigest />
 
       {/* ── Pricing ── */}
       <section className="bg-gray-50 py-20 px-6">
