@@ -1,29 +1,38 @@
-import { getReadingList } from '../../lib/arxiv-db';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { verifySessionCookie } from '../../lib/auth';
+import { getUserReadingList } from '../../lib/reading-list-supa';
 import ReadingListClient from './ReadingListClient';
 import AppNav from '../components/AppNav';
 
 export const dynamic = 'force-dynamic';
 
-export default function ReadingListPage() {
-  const allItems = getReadingList();
-  const unread = getReadingList('unread');
-  const reading = getReadingList('reading');
-  const done = getReadingList('done');
+export default async function ReadingListPage() {
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  const cookieStore = await cookies();
+  const session = cookieStore.get('pb_session')?.value;
+  const auth = session ? verifySessionCookie(session) : { valid: false };
+  if (!auth.valid) redirect('/login');
+
+  const userId = (auth as { valid: boolean; userId?: string }).userId!;
+
+  // ── Fetch from Supabase (per-user) ────────────────────────────────────────
+  let allItems, unread, reading, done;
+  try {
+    [allItems, unread, reading, done] = await Promise.all([
+      getUserReadingList(userId),
+      getUserReadingList(userId, 'unread'),
+      getUserReadingList(userId, 'reading'),
+      getUserReadingList(userId, 'done'),
+    ]);
+  } catch (err) {
+    console.error('[reading-list][page]', err);
+    allItems = unread = reading = done = [];
+  }
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Nav */}
-      <nav className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <a href="/digest" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
-          <div className="flex gap-4 text-sm">
-            <a href="/digest" className="text-gray-500 hover:text-gray-300 transition-colors">Digest</a>
-            <a href="/weekly" className="text-gray-500 hover:text-gray-300 transition-colors">Weekly</a>
-            <a href="/search" className="text-gray-500 hover:text-gray-300 transition-colors">Search</a>
-            <a href="/reading-list" className="text-gray-100 font-medium">Reading List</a>
-          </div>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
         <header>
