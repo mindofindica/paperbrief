@@ -21,6 +21,7 @@ export interface ReadingListPaper {
   arxiv_id: string;
   title: string;
   abstract: string | null;
+  authors: string | null;       // JSON array string, e.g. '["Alice","Bob"]'
   track: string | null;
   llm_score: number | null;
   published_at: string | null;
@@ -62,6 +63,7 @@ export async function getUserReadingList(
       arxiv_id: row.arxiv_id as string,
       title: paper?.title ?? row.arxiv_id ?? 'Unknown paper',
       abstract: paper?.abstract ?? null,
+      authors: paper?.authors ?? null,
       track: paper?.track ?? null,
       llm_score: paper?.llm_score ?? null,
       published_at: paper?.published_at ?? null,

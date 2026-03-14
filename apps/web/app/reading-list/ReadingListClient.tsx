@@ -47,23 +47,43 @@ export default function ReadingListClient({
   const lists: Record<string, Paper[]> = { all, unread, reading, done };
   const items = lists[activeTab] || [];
 
+  // Build the BibTeX export URL — filtered to the active tab when not "all"
+  const bibUrl = activeTab === 'all'
+    ? '/api/reading-list/bibtex'
+    : `/api/reading-list/bibtex?status=${activeTab}`;
+
   return (
     <div className="space-y-4">
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-900 rounded-lg p-1 w-fit">
-        {TABS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={`text-sm px-4 py-2 rounded-md transition-all duration-200 ${
-              activeTab === key
-                ? 'bg-gray-800 text-gray-100 font-medium'
-                : 'text-gray-500 hover:text-gray-300'
-            }`}
+      {/* Tabs + Export */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex gap-1 bg-gray-900 rounded-lg p-1 w-fit">
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`text-sm px-4 py-2 rounded-md transition-all duration-200 ${
+                activeTab === key
+                  ? 'bg-gray-800 text-gray-100 font-medium'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* BibTeX export — only show when there are papers to export */}
+        {all.length > 0 && (
+          <a
+            href={bibUrl}
+            download
+            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 border border-gray-800 hover:border-gray-700 rounded-md px-3 py-1.5 transition-all duration-200"
+            title={`Export ${activeTab === 'all' ? 'all' : activeTab} papers as BibTeX`}
           >
-            {label}
-          </button>
-        ))}
+            <span>📄</span>
+            <span>Export .bib</span>
+          </a>
+        )}
       </div>
 
       {/* Papers */}
