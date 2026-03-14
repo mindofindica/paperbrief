@@ -2,24 +2,20 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
 import { getServiceSupabase } from './supabase';
 
+// Local SQLite — only used by server-side scripts/tools, not by the Next.js app on Vercel.
+// getPaper() uses Supabase exclusively.
 let _db: Database.Database | null = null;
 
 function getDbPath(): string {
   return process.env.ARXIV_COACH_DB_PATH || '/root/.openclaw/state/arxiv-coach/db.sqlite';
 }
 
-function getDb(): Database.Database | null {
+function requireDb(): Database.Database {
   if (_db) return _db;
-  const dbPath = getDbPath();
-  try {
-    _db = new Database(dbPath, { readonly: false });
-    _db.pragma('journal_mode = WAL');
-    _db.pragma('foreign_keys = ON');
-    return _db;
-  } catch {
-    // DB not available (e.g. Vercel serverless — use Supabase instead)
-    return null;
-  }
+  _db = new Database(getDbPath(), { readonly: false });
+  _db.pragma('journal_mode = WAL');
+  _db.pragma('foreign_keys = ON');
+  return _db;
 }
 
 export interface Paper {
@@ -69,12 +65,7 @@ function buildFtsQuery(rawQuery: string): string {
   return tokens.map((t) => `"${t}"`).join(' ');
 }
 
-// Throws if local SQLite is unavailable (Vercel). Sync functions require the DB.
-function requireDb(): Database.Database {
-  const db = getDb();
-  if (!db) throw new Error('Local SQLite DB unavailable in this environment');
-  return db;
-}
+
 
 // Map real schema → normalised Paper shape
 function rowToPaper(row: any): Paper {
@@ -189,24 +180,6 @@ export function searchPapers(options: SearchPapersOptions): Paper[] {
 }
 
 export async function getPaper(arxivId: string): Promise<Paper | undefined> {
-  // Try local SQLite first (dev / VPS), fall back to Supabase (Vercel)
-  const db = getDb();
-  if (db) {
-    try {
-      const row = db.prepare(`
-        SELECT p.*, ls.relevance_score,
-               (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) as track
-        FROM papers p
-        LEFT JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
-        WHERE p.arxiv_id = ?
-      `).get(arxivId) as any;
-      if (row) return rowToPaper(row);
-    } catch {
-      // fall through to Supabase
-    }
-  }
-
-  // Supabase path — used on Vercel where local SQLite is unavailable
   try {
     const supabase = getServiceSupabase();
     const [paperRes, digestRes] = await Promise.all([
@@ -861,7 +834,7 @@ export function getWeeklyKeywordTrends(limit = 15): WeeklyKeyword[] {
 }
 
 export function getRawDb(): Database.Database {
-  return getDb();
+  return requireDb();
 }
 
 export function closeDb(): void {
