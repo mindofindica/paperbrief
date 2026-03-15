@@ -83,7 +83,7 @@ export async function GET(req: Request) {
   }
 
   const users = authData?.users ?? [];
-  const total = authData?.total ?? 0;
+  const total = (authData as { total?: number } | null)?.total ?? users.length;
 
   if (users.length === 0) {
     return NextResponse.json({ total: 0, users: [] });
