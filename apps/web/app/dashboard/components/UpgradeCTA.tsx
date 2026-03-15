@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 interface UpgradeCTAProps {
   plan: 'free' | 'pro';
@@ -62,13 +63,21 @@ export default function UpgradeCTA({ plan, trackCount, trackLimit }: UpgradeCTAP
             {trackCount} / {trackLimit} tracks · daily digest
           </p>
         </div>
-        <button
-          onClick={handleManage}
-          disabled={loading}
-          className="text-xs text-violet-400 underline underline-offset-2 hover:text-violet-300 disabled:opacity-50"
-        >
-          {loading ? 'Loading…' : 'Manage billing'}
-        </button>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/settings"
+            className="text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            Settings
+          </Link>
+          <button
+            onClick={handleManage}
+            disabled={loading}
+            className="text-xs text-violet-400 underline underline-offset-2 hover:text-violet-300 disabled:opacity-50"
+          >
+            {loading ? 'Loading…' : 'Manage billing'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -86,7 +95,10 @@ export default function UpgradeCTA({ plan, trackCount, trackLimit }: UpgradeCTAP
             {atLimit ? '⚠️ Track limit reached' : '⬆ Upgrade to Pro'}
           </p>
           <p className="text-xs text-gray-400">
-            Free plan: {trackCount} / {trackLimit} track · weekly digest
+            Free plan: {trackCount} / {trackLimit} track · weekly digest ·{' '}
+            <Link href="/settings" className="text-gray-500 hover:text-gray-300 underline underline-offset-2 transition-colors">
+              settings
+            </Link>
           </p>
           <p className="text-xs text-gray-500 mt-1">
             Pro unlocks 5 tracks, daily digests, and paper chat — $12 / mo.
