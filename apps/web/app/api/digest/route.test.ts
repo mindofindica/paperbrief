@@ -1,324 +1,243 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from './route';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(),
+vi.mock('../../../lib/supabase', () => ({ getServiceSupabase: vi.fn() }));
+vi.mock('../../../lib/email/send-digest', () => ({ sendDigestEmail: vi.fn() }));
+vi.mock('../../../lib/unsubscribe-token', () => ({
+  buildUnsubscribeUrl: vi.fn().mockReturnValue('https://paperbrief.ai/unsubscribe?token=x'),
 }));
 
-vi.mock('@paperbrief/core', () => ({
-  fetchRecentPapers: vi.fn(),
-  prefilterPapers: vi.fn(),
-  scorePapers: vi.fn(),
-  buildDigest: vi.fn(),
-}));
-
-vi.mock('../../../lib/email/send-digest', () => ({
-  sendDigestEmail: vi.fn(),
-}));
-
-import { createClient } from '@supabase/supabase-js';
-import {
-  fetchRecentPapers,
-  prefilterPapers,
-  scorePapers,
-  buildDigest,
-} from '@paperbrief/core';
+import { getServiceSupabase } from '../../../lib/supabase';
 import { sendDigestEmail } from '../../../lib/email/send-digest';
+import { POST } from './route';
 
-const mockCreateClient = vi.mocked(createClient);
-const mockFetchRecentPapers = vi.mocked(fetchRecentPapers);
-const mockPrefilterPapers = vi.mocked(prefilterPapers);
-const mockScorePapers = vi.mocked(scorePapers);
-const mockBuildDigest = vi.mocked(buildDigest);
+const mockGetServiceSupabase = vi.mocked(getServiceSupabase);
 const mockSendDigestEmail = vi.mocked(sendDigestEmail);
 
 // ─── fixtures ─────────────────────────────────────────────────────────────────
 
-const TRACK_ROW = {
+const CRON_SECRET = 'test-cron-secret';
+const TRACK = {
   id: 'track-1',
   user_id: 'user-1',
-  name: 'Speculative Decoding',
-  keywords: ['speculative decoding', 'draft model'],
-  arxiv_cats: ['cs.LG', 'cs.CL'],
+  name: 'AI Agents & Reasoning',
+  keywords: ['AI agent', 'tool use'],
+  arxiv_cats: ['cs.AI', 'cs.CL'],
   min_score: 3,
 };
 
-const PAPER = {
-  arxivId: '2502.00001',
-  version: 'v1',
-  title: 'Fast Inference via Speculative Decoding',
-  abstract: 'We propose ...',
-  authors: ['Alice', 'Bob'],
-  categories: ['cs.LG'],
-  publishedAt: '2026-02-01',
-  updatedAt: '2026-02-01',
-  absUrl: 'https://arxiv.org/abs/2502.00001',
-  pdfUrl: null,
+const PAPER_ROW = {
+  arxiv_id: '2503.00001',
+  title: 'AI Agents with Tool Use',
+  abstract: 'We present a new framework for AI agent tool use with strong results.',
+  authors: ['Alice Smith', 'Bob Jones'],
+  categories: ['cs.AI'],
+  published_at: '2026-03-14',
+  llm_score: 4,
 };
 
-const SCORED_PAPER = {
-  paper: PAPER,
-  trackId: 'track-1',
-  trackName: 'Speculative Decoding',
-  score: 5,
-  reason: 'Direct match',
-  summary: 'Summary text.',
-};
-
-const DIGEST = {
-  userId: 'user-1',
-  weekOf: '2026-02-23',
-  entries: [
-    {
-      arxivId: '2502.00001',
-      title: 'Fast Inference via Speculative Decoding',
-      authors: 'Alice, Bob',
-      score: 5,
-      scoreLabel: '🔥 Essential',
-      summary: 'Summary text.',
-      reason: 'Direct match',
-      absUrl: 'https://arxiv.org/abs/2502.00001',
-      trackName: 'Speculative Decoding',
-    },
-  ],
-  tracksIncluded: ['Speculative Decoding'],
-  totalPapersScanned: 10,
-  totalPapersIncluded: 1,
-  generatedAt: new Date().toISOString(),
-};
-
-// Build a mock Supabase client for the cron route
-function makeClientMock({
-  tracks = [TRACK_ROW],
-  tracksError = null as unknown,
-  userEmail = 'user@example.com',
-  upsertResult = { error: null },
-  emailPrefs = { digest_subscribed: true } as { digest_subscribed: boolean } | null,
+function makeSupabaseMock({
+  tracks = [TRACK],
+  prefs = null as { digest_subscribed: boolean } | null,
+  email = 'user@test.com',
+  papers = [PAPER_ROW],
+  rpcError = null as string | null,
 } = {}) {
-  const authAdmin = {
-    getUserById: vi.fn().mockResolvedValue({
-      data: { user: { email: userEmail } },
-    }),
-  };
+  const mockRpc = vi.fn().mockImplementation((fn: string) => {
+    if (fn === 'get_user_email_by_id') return Promise.resolve({ data: rpcError ? null : email, error: rpcError });
+    if (fn === 'search_papers_for_digest') return Promise.resolve({ data: papers, error: null });
+    return Promise.resolve({ data: null, error: null });
+  });
 
-  // tracks query — uses Promise-like .then()
-  const tracksSelectQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    then: vi.fn((resolve: (v: unknown) => void) =>
-      resolve({ data: tracks, error: tracksError })
-    ),
-  };
+  const mockFrom = vi.fn().mockImplementation((table: string) => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: prefs, error: null }),
+    };
 
-  // user_email_prefs query — uses .single() → returns a Promise
-  const emailPrefsSelectQuery = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: emailPrefs, error: null }),
-  };
+    if (table === 'tracks') {
+      chain.eq = vi.fn().mockReturnThis();
+      chain.then = (resolve: any) => resolve({ data: tracks, error: null });
+    }
+    if (table === 'user_email_prefs') {
+      chain.maybeSingle = vi.fn().mockResolvedValue({ data: prefs, error: null });
+    }
+    if (table === 'paper_digest_entries') {
+      chain.then = (resolve: any) => resolve({ data: [], error: null });
+    }
 
-  const upsertQuery = {
-    upsert: vi.fn().mockResolvedValue(upsertResult),
-  };
+    return chain;
+  });
 
-  return {
-    from: vi.fn().mockImplementation((table: string) => {
-      if (table === 'deliveries') return upsertQuery;
-      if (table === 'user_email_prefs') return emailPrefsSelectQuery;
-      return tracksSelectQuery;
-    }),
-    auth: { admin: authAdmin },
-  };
+  return { from: mockFrom, rpc: mockRpc };
 }
 
-function makeRequest(body: Record<string, unknown> = {}, cronSecret = 'test-secret') {
+function makeRequest(body: object = {}) {
   return new NextRequest('http://localhost/api/digest', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${cronSecret}`,
+      'authorization': `Bearer ${CRON_SECRET}`,
+      'content-type': 'application/json',
     },
     body: JSON.stringify(body),
   });
 }
 
-// ─── tests ────────────────────────────────────────────────────────────────────
-
 beforeEach(() => {
-  vi.resetAllMocks();
-  process.env.CRON_SECRET = 'test-secret';
-  process.env.SUPABASE_URL = 'https://test.supabase.co';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
-  process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
+  vi.clearAllMocks();
+  process.env.CRON_SECRET = CRON_SECRET;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
 });
 
+// ─── tests ────────────────────────────────────────────────────────────────────
+
 describe('POST /api/digest', () => {
-  it('returns 401 when Authorization header is missing', async () => {
+  it('returns 401 without cron secret', async () => {
     const req = new NextRequest('http://localhost/api/digest', {
       method: 'POST',
-      body: JSON.stringify({}),
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when CRON_SECRET is wrong', async () => {
-    const res = await POST(makeRequest({}, 'wrong-secret'));
+  it('returns 401 with wrong secret', async () => {
+    const req = new NextRequest('http://localhost/api/digest', {
+      method: 'POST',
+      headers: { authorization: 'Bearer wrong', 'content-type': 'application/json' },
+      body: '{}',
+    });
+    const res = await POST(req);
     expect(res.status).toBe(401);
-    const body = await res.json() as { error: string };
-    expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns 500 when SUPABASE_URL is missing', async () => {
-    delete process.env.SUPABASE_URL;
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
-    expect(body.error).toBe('Missing server configuration');
-  });
+  it('returns no tracks message when no active tracks exist', async () => {
+    const supabase = makeSupabaseMock({ tracks: [] });
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
 
-  it('returns 500 when SUPABASE_SERVICE_ROLE_KEY is missing', async () => {
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     const res = await POST(makeRequest());
-    expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
-    expect(body.error).toBe('Missing server configuration');
-  });
-
-  it('returns processed=0 when no active tracks exist', async () => {
-    mockCreateClient.mockReturnValue(makeClientMock({ tracks: [] }) as never);
-    const res = await POST(makeRequest());
+    const json = await res.json();
     expect(res.status).toBe(200);
-    const body = await res.json() as { processed: number; message: string };
-    expect(body.processed).toBe(0);
-    expect(body.message).toBe('No active tracks');
+    expect(json.processed).toBe(0);
   });
 
-  it('fetches papers, scores them, builds digest, sends email, and records delivery', async () => {
-    mockCreateClient.mockReturnValue(makeClientMock() as never);
-    mockFetchRecentPapers.mockResolvedValue([PAPER]);
-    mockPrefilterPapers.mockReturnValue([PAPER]);
-    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
-    mockBuildDigest.mockReturnValue(DIGEST);
-    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'email-id-1' });
+  it('skips user with digest_subscribed=false', async () => {
+    const supabase = makeSupabaseMock({ prefs: { digest_subscribed: false } });
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
 
     const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    const body = await res.json() as { success: boolean; processed: number };
-    expect(body.success).toBe(true);
-    expect(body.processed).toBe(1);
-
-    expect(mockFetchRecentPapers).toHaveBeenCalledOnce();
-    expect(mockScorePapers).toHaveBeenCalledOnce();
-    expect(mockSendDigestEmail).toHaveBeenCalledOnce();
-    expect(mockSendDigestEmail.mock.calls[0][0]).toMatchObject({
-      to: 'user@example.com',
-      digest: DIGEST,
-    });
-  });
-
-  it('scopes tracks to a specific userId when provided', async () => {
-    const clientMock = makeClientMock();
-    mockCreateClient.mockReturnValue(clientMock as never);
-    mockFetchRecentPapers.mockResolvedValue([PAPER]);
-    mockPrefilterPapers.mockReturnValue([PAPER]);
-    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
-    mockBuildDigest.mockReturnValue(DIGEST);
-    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'email-id-1' });
-
-    await POST(makeRequest({ userId: 'user-1' }));
-
-    // The tracks query should chain .eq('user_id', 'user-1') — verified by
-    // checking the from() call was made for 'tracks'
-    expect(clientMock.from).toHaveBeenCalledWith('tracks');
-  });
-
-  it('skips sending when digest has no entries', async () => {
-    const emptyDigest = { ...DIGEST, entries: [] };
-    mockCreateClient.mockReturnValue(makeClientMock() as never);
-    mockFetchRecentPapers.mockResolvedValue([PAPER]);
-    mockPrefilterPapers.mockReturnValue([PAPER]);
-    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
-    mockBuildDigest.mockReturnValue(emptyDigest);
-
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    const body = await res.json() as { processed: number };
-    // No entries → no email sent, no delivery recorded
+    const json = await res.json();
+    expect(json.processed).toBe(0);
     expect(mockSendDigestEmail).not.toHaveBeenCalled();
-    expect(body.processed).toBe(0);
   });
 
-  it('continues processing other users when one email send fails', async () => {
-    const user2Track = { ...TRACK_ROW, id: 'track-2', user_id: 'user-2' };
-    const clientMock = makeClientMock({ tracks: [TRACK_ROW, user2Track] });
-    // getUserById returns different emails for each user
-    let callCount = 0;
-    clientMock.auth.admin.getUserById = vi.fn().mockImplementation(() => {
-      callCount++;
-      return Promise.resolve({
-        data: { user: { email: callCount === 1 ? 'u1@example.com' : 'u2@example.com' } },
-      });
-    });
-    mockCreateClient.mockReturnValue(clientMock as never);
-    mockFetchRecentPapers.mockResolvedValue([PAPER]);
-    mockPrefilterPapers.mockReturnValue([PAPER]);
-    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
-    mockBuildDigest.mockReturnValue(DIGEST);
-    mockSendDigestEmail
-      .mockResolvedValueOnce({ ok: false, error: 'Rate limit' })
-      .mockResolvedValueOnce({ ok: true, id: 'email-id-2' });
+  it('skips user when email lookup returns null', async () => {
+    const supabase = makeSupabaseMock({ rpcError: 'not found' });
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
 
     const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    // Both users processed (delivery recorded even if email failed)
-    const body = await res.json() as { processed: number };
-    expect(body.processed).toBe(2);
-  });
-
-  it('skips delivery for users who have unsubscribed from emails', async () => {
-    mockCreateClient.mockReturnValue(
-      makeClientMock({ emailPrefs: { digest_subscribed: false } }) as never
-    );
-    mockFetchRecentPapers.mockResolvedValue([PAPER]);
-    mockPrefilterPapers.mockReturnValue([PAPER]);
-    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
-    mockBuildDigest.mockReturnValue(DIGEST);
-
-    const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    const body = await res.json() as { processed: number };
-    // User has opted out — no email sent, delivery not recorded
+    const json = await res.json();
+    expect(json.processed).toBe(0);
     expect(mockSendDigestEmail).not.toHaveBeenCalled();
-    expect(body.processed).toBe(0);
   });
 
-  it('sends email to users with no prefs row (default = subscribed)', async () => {
-    mockCreateClient.mockReturnValue(
-      makeClientMock({ emailPrefs: null }) as never
-    );
-    mockFetchRecentPapers.mockResolvedValue([PAPER]);
-    mockPrefilterPapers.mockReturnValue([PAPER]);
-    mockScorePapers.mockResolvedValue([SCORED_PAPER]);
-    mockBuildDigest.mockReturnValue(DIGEST);
-    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'email-id-1' });
+  it('skips user when no papers match tracks', async () => {
+    const supabase = makeSupabaseMock({ papers: [] });
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
 
     const res = await POST(makeRequest());
-    expect(res.status).toBe(200);
-    // No prefs row → assume subscribed → send
+    const json = await res.json();
+    expect(json.processed).toBe(0);
+    expect(mockSendDigestEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends digest email and records delivery when papers match', async () => {
+    const supabase = makeSupabaseMock();
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'email-123' });
+
+    const res = await POST(makeRequest());
+    const json = await res.json();
+    expect(json.processed).toBe(1);
     expect(mockSendDigestEmail).toHaveBeenCalledOnce();
+
+    const callArgs = mockSendDigestEmail.mock.calls[0]![0];
+    expect(callArgs.to).toBe('user@test.com');
+    expect(callArgs.digest.entries).toHaveLength(1);
+    expect(callArgs.digest.entries[0].arxivId).toBe('2503.00001');
+    expect(callArgs.digest.entries[0].trackName).toBe('AI Agents & Reasoning');
   });
 
-  it('returns 500 on unexpected error', async () => {
-    mockCreateClient.mockReturnValue(makeClientMock() as never);
-    mockFetchRecentPapers.mockRejectedValue(new Error('arXiv API down'));
+  it('digest entry has correct score label', async () => {
+    const supabase = makeSupabaseMock();
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'x' });
+
+    await POST(makeRequest());
+    const entry = mockSendDigestEmail.mock.calls[0]![0].digest.entries[0];
+    expect(entry.score).toBe(4);
+    expect(entry.scoreLabel).toBe('⭐ Relevant');
+  });
+
+  it('includes unsubscribe URL in email', async () => {
+    const supabase = makeSupabaseMock();
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'x' });
+
+    await POST(makeRequest());
+    expect(mockSendDigestEmail.mock.calls[0]![0].unsubscribeUrl).toContain('unsubscribe');
+  });
+
+  it('counts error but continues when email send fails', async () => {
+    const supabase = makeSupabaseMock();
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: false, error: 'smtp error' });
 
     const res = await POST(makeRequest());
-    expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
-    expect(body.error).toBe('Internal server error');
+    const json = await res.json();
+    expect(json.processed).toBe(0);
+    expect(json.errors).toHaveLength(1);
+  });
+
+  it('accepts targetUserId in body for single-user delivery', async () => {
+    const supabase = makeSupabaseMock();
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'x' });
+
+    const res = await POST(makeRequest({ userId: 'user-1' }));
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.processed).toBe(1);
+  });
+
+  it('formats authors correctly for single author', async () => {
+    const supabase = makeSupabaseMock({
+      papers: [{ ...PAPER_ROW, authors: ['Alice Smith'] }],
+    });
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'x' });
+
+    await POST(makeRequest());
+    const entry = mockSendDigestEmail.mock.calls[0]![0].digest.entries[0];
+    expect(entry.authors).toBe('Alice Smith');
+  });
+
+  it('formats authors correctly for many authors', async () => {
+    const supabase = makeSupabaseMock({
+      papers: [{ ...PAPER_ROW, authors: ['Alice', 'Bob', 'Carol'] }],
+    });
+    mockGetServiceSupabase.mockReturnValue(supabase as any);
+    mockSendDigestEmail.mockResolvedValue({ ok: true, id: 'x' });
+
+    await POST(makeRequest());
+    const entry = mockSendDigestEmail.mock.calls[0]![0].digest.entries[0];
+    expect(entry.authors).toBe('Alice et al.');
   });
 });
