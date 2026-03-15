@@ -5,6 +5,13 @@ import { getServiceSupabase } from '../../../lib/supabase';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://paperbrief.ai';
 
+async function getUserIdByEmail(email: string): Promise<string | null> {
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase.rpc('get_user_id_by_email', { p_email: email });
+  if (error || !data) return null;
+  return data as string;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { email } = (await request.json()) as { email?: string };
@@ -12,17 +19,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Missing email' }, { status: 400 });
     }
 
-    // Look up (or create) the user in Supabase auth to get their real UUID
     const supabase = getServiceSupabase();
-    let userId: string;
 
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existing = (existingUsers?.users ?? []).find(u => u.email === email);
-
-    if (existing) {
-      userId = existing.id;
-    } else {
-      // Create the user so they get a stable UUID
+    let userId = await getUserIdByEmail(email);
+    if (!userId) {
       const { data: created, error: createError } = await supabase.auth.admin.createUser({
         email,
         email_confirm: true,
