@@ -14,22 +14,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '../../../lib/supabase';
 import { verifySessionCookie } from '../../../lib/auth';
 import { getSubscription } from '../../../lib/stripe';
+import { resolveFrequency } from '../../../lib/digest-settings';
+import type { DigestFrequencyOverride, UserSettings } from '../../../lib/digest-settings';
+import { PRO_FREQUENCIES, FREE_FREQUENCIES } from '../../../lib/digest-settings';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type DigestFrequencyOverride = 'auto' | 'daily' | 'twice_weekly' | 'weekly';
 
-export interface UserSettings {
-  digestFrequencyOverride: DigestFrequencyOverride;
-  /** Resolved frequency based on override + plan: always one of daily | twice_weekly | weekly */
-  digestFrequencyResolved: 'daily' | 'twice_weekly' | 'weekly';
-  digestHour: number;       // 0–23 UTC
-  digestPaused: boolean;
-  plan: 'free' | 'pro';
-}
 
-const PRO_FREQUENCIES: DigestFrequencyOverride[] = ['auto', 'daily', 'twice_weekly', 'weekly'];
-const FREE_FREQUENCIES: DigestFrequencyOverride[] = ['auto', 'weekly'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,23 +30,6 @@ function getUserIdFromRequest(req: NextRequest): string | null {
   if (!session) return null;
   const result = verifySessionCookie(session);
   return result.valid ? result.userId ?? null : null;
-}
-
-/**
- * Resolve the concrete digest schedule from the stored override + plan.
- */
-export function resolveFrequency(
-  override: DigestFrequencyOverride,
-  plan: 'free' | 'pro',
-): 'daily' | 'twice_weekly' | 'weekly' {
-  if (override === 'auto') {
-    return plan === 'pro' ? 'daily' : 'weekly';
-  }
-  // Pro-only frequencies fall back to weekly if plan degrades
-  if (plan === 'free' && (override === 'daily' || override === 'twice_weekly')) {
-    return 'weekly';
-  }
-  return override;
 }
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -181,5 +156,3 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   return GET(request);
 }
 
-// Export plan helpers for testing
-export { FREE_FREQUENCIES, PRO_FREQUENCIES };
