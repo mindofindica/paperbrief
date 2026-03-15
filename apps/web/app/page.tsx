@@ -39,8 +39,10 @@ export default async function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <span className="font-bold text-xl text-gray-900">📄 PaperBrief</span>
         <div className="flex items-center gap-4">
+          <a href="/trending" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Trending</a>
           <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</a>
-          <div className="hidden md:block w-[320px]">
+          <a href="/login" className="text-sm font-medium text-gray-900 hover:text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:border-gray-400 transition-colors">Sign in</a>
+          <div className="hidden md:block w-[280px]">
             <WaitlistForm compact buttonText="Join waitlist" />
           </div>
         </div>
@@ -130,6 +132,11 @@ export default async function LandingPage() {
 
       {/* ── Sample Digest ── */}
       <SampleDigest />
+      <div className="text-center py-4 -mt-4 pb-12">
+        <a href="/trending" className="text-sm text-gray-500 hover:text-gray-800 underline underline-offset-2">
+          See what's trending live →
+        </a>
+      </div>
 
       {/* ── Pricing ── */}
       <section className="bg-gray-50 py-20 px-6">
