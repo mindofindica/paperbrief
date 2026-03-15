@@ -56,7 +56,7 @@ export default async function Image({
   params: Promise<{ arxivId: string }>;
 }) {
   const { arxivId } = await params;
-  const paper = getPaper(arxivId);
+  const paper = await getPaper(arxivId);
 
   // ── Fallback card (paper not found) ─────────────────────────────────────────
   if (!paper) {

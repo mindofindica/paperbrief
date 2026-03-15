@@ -46,12 +46,12 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
   },
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Fetch scored papers from the last 180 days (cap at 5 000 URLs)
   let paperRoutes: MetadataRoute.Sitemap = [];
 
   try {
-    const papers = getSitemapPapers(180, 5000);
+    const papers = await getSitemapPapers(180, 5000);
 
     paperRoutes = papers.map((paper) => ({
       url: `${SITE_URL}/paper/${encodeURIComponent(paper.arxiv_id)}`,

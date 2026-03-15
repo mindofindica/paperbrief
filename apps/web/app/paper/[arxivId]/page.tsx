@@ -14,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ arxivId: string }>;
 }): Promise<Metadata> {
   const { arxivId } = await params;
-  const paper = getPaper(arxivId);
+  const paper = await getPaper(arxivId);
 
   if (!paper) {
     return {

@@ -848,27 +848,24 @@ export interface SitemapPaper {
  * Scoped to scored papers from the last `daysBack` days (default 180).
  * Capped at `limit` rows (default 5000) to keep the sitemap manageable.
  */
-export function getSitemapPapers(
+export async function getSitemapPapers(
   daysBack = 180,
   limit = 5000,
-): SitemapPaper[] {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `
-      SELECT p.arxiv_id,
-             p.published_at,
-             p.published_at AS updated_at
-      FROM papers p
-      JOIN llm_scores ls ON p.arxiv_id = ls.arxiv_id
-      WHERE ls.relevance_score IS NOT NULL
-        AND p.published_at >= DATE('now', ? || ' days')
-      ORDER BY p.published_at DESC
-      LIMIT ?
-    `,
-    )
-    .all(`-${daysBack}`, limit) as SitemapPaper[];
-  return rows;
+): Promise<SitemapPaper[]> {
+  const supabase = getServiceSupabase();
+  const since = new Date(Date.now() - daysBack * 86400_000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from('papers')
+    .select('arxiv_id, published_at')
+    .gte('published_at', since)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map((r: { arxiv_id: string; published_at: string }) => ({
+    arxiv_id: r.arxiv_id,
+    published_at: r.published_at,
+    updated_at: r.published_at,
+  }));
 }
 
 export function closeDb(): void {

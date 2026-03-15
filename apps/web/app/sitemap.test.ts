@@ -40,7 +40,7 @@ describe('sitemap()', () => {
 
   beforeEach(() => {
     vi.resetModules();
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -54,9 +54,9 @@ describe('sitemap()', () => {
   // ── static routes ──────────────────────────────────────────────────────────
 
   it('returns the 6 static routes', async () => {
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain('https://paperbrief.ai');
     expect(urls).toContain('https://paperbrief.ai/trending');
@@ -68,23 +68,23 @@ describe('sitemap()', () => {
   });
 
   it('assigns priority 1.0 to homepage', async () => {
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
-    const home = sitemap().find((e) => e.url === 'https://paperbrief.ai');
+    const home = (await sitemap()).find((e) => e.url === 'https://paperbrief.ai');
     expect(home?.priority).toBe(1.0);
   });
 
   it('assigns changeFrequency "hourly" to /trending', async () => {
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
-    const trending = sitemap().find((e) => e.url.endsWith('/trending'));
+    const trending = (await sitemap()).find((e) => e.url.endsWith('/trending'));
     expect(trending?.changeFrequency).toBe('hourly');
   });
 
   it('assigns changeFrequency "monthly" to /pricing', async () => {
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
-    const pricing = sitemap().find((e) => e.url.endsWith('/pricing'));
+    const pricing = (await sitemap()).find((e) => e.url.endsWith('/pricing'));
     expect(pricing?.changeFrequency).toBe('monthly');
   });
 
@@ -92,9 +92,9 @@ describe('sitemap()', () => {
 
   it('appends paper routes for each paper returned by getSitemapPapers', async () => {
     const papers = makePapers(3);
-    mockGetSitemapPapers.mockReturnValue(papers);
+    mockGetSitemapPapers.mockResolvedValue(papers);
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     expect(entries.length).toBe(6 + 3);
     for (const paper of papers) {
       expect(entries.some((e) => e.url.includes(paper.arxiv_id))).toBe(true);
@@ -102,32 +102,32 @@ describe('sitemap()', () => {
   });
 
   it('URL-encodes special characters in arxiv IDs', async () => {
-    mockGetSitemapPapers.mockReturnValue([
+    mockGetSitemapPapers.mockResolvedValue([
       { arxiv_id: 'cs/0312045', published_at: '2024-01-15', updated_at: null },
     ]);
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     const paperUrl = entries.find((e) => e.url.includes('cs'));
     expect(paperUrl?.url).toBe('https://paperbrief.ai/paper/cs%2F0312045');
   });
 
   it('uses published_at as lastModified for paper routes', async () => {
-    mockGetSitemapPapers.mockReturnValue([
+    mockGetSitemapPapers.mockResolvedValue([
       { arxiv_id: '2401.00001', published_at: '2024-01-20', updated_at: null },
     ]);
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     const paper = entries.find((e) => e.url.includes('2401.00001'));
     expect(paper?.lastModified).toEqual(new Date('2024-01-20'));
   });
 
   it('falls back to current date when published_at is null', async () => {
     const before = Date.now();
-    mockGetSitemapPapers.mockReturnValue([
+    mockGetSitemapPapers.mockResolvedValue([
       { arxiv_id: '2401.00002', published_at: null, updated_at: null },
     ]);
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     const after = Date.now();
     const paper = entries.find((e) => e.url.includes('2401.00002'));
     const ts = (paper?.lastModified as Date).getTime();
@@ -136,9 +136,9 @@ describe('sitemap()', () => {
   });
 
   it('assigns priority 0.6 and changeFrequency "monthly" to paper routes', async () => {
-    mockGetSitemapPapers.mockReturnValue(makePapers(1));
+    mockGetSitemapPapers.mockResolvedValue(makePapers(1));
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     const paper = entries.find((e) => e.url.includes('/paper/'));
     expect(paper?.priority).toBe(0.6);
     expect(paper?.changeFrequency).toBe('monthly');
@@ -151,13 +151,13 @@ describe('sitemap()', () => {
       throw new Error('DB unavailable');
     });
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     expect(entries.length).toBe(6);
     expect(entries.every((e) => !e.url.includes('/paper/'))).toBe(true);
   });
 
   it('does not throw when called with an empty DB', async () => {
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
     expect(() => sitemap()).not.toThrow();
   });
@@ -167,33 +167,33 @@ describe('sitemap()', () => {
   it('uses NEXT_PUBLIC_SITE_URL env var when set', async () => {
     process.env.NEXT_PUBLIC_SITE_URL = 'https://staging.paperbrief.ai';
     vi.resetModules();
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     expect(entries[0].url).toBe('https://staging.paperbrief.ai');
   });
 
   // ── edge cases ─────────────────────────────────────────────────────────────
 
   it('handles 500 papers without throwing', async () => {
-    mockGetSitemapPapers.mockReturnValue(makePapers(500));
+    mockGetSitemapPapers.mockResolvedValue(makePapers(500));
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     expect(entries.length).toBe(6 + 500);
   });
 
   it('does not produce duplicate URLs', async () => {
-    mockGetSitemapPapers.mockReturnValue(makePapers(10));
+    mockGetSitemapPapers.mockResolvedValue(makePapers(10));
     const { default: sitemap } = await import('./sitemap');
-    const entries = sitemap();
+    const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     const unique = new Set(urls);
     expect(unique.size).toBe(urls.length);
   });
 
   it('returns an array', async () => {
-    mockGetSitemapPapers.mockReturnValue([]);
+    mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
-    expect(Array.isArray(sitemap())).toBe(true);
+    expect(Array.isArray(await sitemap())).toBe(true);
   });
 });
