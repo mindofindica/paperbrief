@@ -16,10 +16,12 @@ import { sendDigestEmail } from '../../../lib/email/send-digest';
 import { buildUnsubscribeUrl } from '../../../lib/unsubscribe-token';
 import { scoreLabel } from '@paperbrief/core';
 import type { Digest, DigestEntry } from '@paperbrief/core';
+import { getPapersByFollowedAuthors } from '../../../lib/author-follows';
 
 const DEDUP_DAYS = 21;
 const MAX_PAPERS_PER_DIGEST = 10;
 const MIN_LLM_SCORE = 3; // papers below this are filtered out
+const MAX_FOLLOWED_PAPERS = 3;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Verify cron secret
@@ -127,6 +129,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         if (!entries.length) continue;
 
+        // Fetch papers from followed authors (non-fatal if throws)
+        let followedAuthorPapers: DigestEntry[] = [];
+        try {
+          const followedRaw = await getPapersByFollowedAuthors(userId, 10);
+          followedAuthorPapers = followedRaw
+            .filter((p) => !sentIds.has(p.arxiv_id))
+            .slice(0, MAX_FOLLOWED_PAPERS)
+            .map((p) => {
+              const entry: DigestEntry = {
+                arxivId: p.arxiv_id,
+                title: p.title,
+                authors: formatAuthors(p.authors ?? []),
+                score: p.llm_score ?? MIN_LLM_SCORE,
+                scoreLabel: scoreLabel(p.llm_score ?? MIN_LLM_SCORE),
+                summary: p.abstract.slice(0, 300) + (p.abstract.length > 300 ? '…' : ''),
+                reason: `From author you follow: ${p.matched_author}`,
+                absUrl: `https://arxiv.org/abs/${p.arxiv_id}`,
+                trackName: 'Following',
+              };
+              sentIds.add(p.arxiv_id);
+              return entry;
+            });
+        } catch (followErr) {
+          console.warn('[digest] Failed to fetch followed author papers for', userId, followErr);
+        }
+
         // Build digest object
         const digest: Digest = {
           userId,
@@ -140,7 +168,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         // Send email
         const unsubscribeUrl = buildUnsubscribeUrl(userId, email as string);
-        const sendResult = await sendDigestEmail({ to: email as string, digest, unsubscribeUrl });
+        const sendResult = await sendDigestEmail({
+          to: email as string,
+          digest,
+          unsubscribeUrl,
+          followedAuthorPapers: followedAuthorPapers.length ? followedAuthorPapers : undefined,
+        });
         if (!sendResult.ok && !('skipped' in sendResult && sendResult.skipped)) {
           console.error('[digest] Email failed for', email, ':', (sendResult as any).error);
           errors.push(`${email}: ${(sendResult as any).error}`);

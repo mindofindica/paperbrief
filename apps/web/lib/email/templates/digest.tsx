@@ -35,6 +35,12 @@ interface DigestEmailProps {
    *   feedbackUrls[arxivId] = { likeUrl: string; skipUrl: string }
    */
   feedbackUrls?: Record<string, { likeUrl: string; skipUrl: string }>;
+  /**
+   * Papers from authors the user follows.
+   * When present and non-empty, rendered as a "Researchers You Follow" section
+   * below the track-based papers (no feedback buttons in this section).
+   */
+  followedAuthorPapers?: DigestEntry[];
 }
 
 // ── Score → visual representation ────────────────────────────────────────────
@@ -154,6 +160,7 @@ export function DigestEmail({
   unsubscribeUrl = "https://paperbrief.ai/unsubscribe",
   dashboardUrl = "https://paperbrief.ai/dashboard",
   feedbackUrls,
+  followedAuthorPapers,
 }: DigestEmailProps) {
   // Group entries by track
   const byTrack = new Map<string, DigestEntry[]>();
@@ -198,6 +205,19 @@ export function DigestEmail({
               feedbackUrls={feedbackUrls}
             />
           ))}
+
+          {/* Followed author papers section */}
+          {followedAuthorPapers && followedAuthorPapers.length > 0 ? (
+            <>
+              <Hr style={hr} />
+              <Section style={trackSectionStyle}>
+                <Heading style={followedHeading}>📌 Researchers You Follow</Heading>
+                {followedAuthorPapers.map((e) => (
+                  <PaperCard key={e.arxivId} entry={e} />
+                ))}
+              </Section>
+            </>
+          ) : null}
 
           {/* Footer CTA */}
           <Hr style={hr} />
@@ -280,6 +300,13 @@ const trackHeading: React.CSSProperties = {
   margin: "16px 0 8px",
   textTransform: "uppercase",
   letterSpacing: "0.05em",
+};
+
+const followedHeading: React.CSSProperties = {
+  fontSize: "18px",
+  fontWeight: "700",
+  color: "#4f46e5",
+  margin: "16px 0 8px",
 };
 
 const cardStyle: React.CSSProperties = {
