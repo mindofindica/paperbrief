@@ -105,7 +105,7 @@ export default async function TrendingPage() {
           <a href="/" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
           <div className="flex gap-4 text-sm items-center">
             <a href="/trending" className="text-gray-100 font-medium">Trending</a>
-            <a href="/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</a>
+            <a href="/auth/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</a>
             <a
               href="/"
               className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"

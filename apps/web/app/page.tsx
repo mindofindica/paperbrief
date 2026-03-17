@@ -41,7 +41,7 @@ export default async function LandingPage() {
         <div className="flex items-center gap-4">
           <a href="/trending" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Trending</a>
           <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</a>
-          <a href="/login" className="text-sm font-medium text-gray-900 hover:text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:border-gray-400 transition-colors">Sign in</a>
+          <a href="/auth/login" className="text-sm font-medium text-gray-900 hover:text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:border-gray-400 transition-colors">Sign in</a>
           <div className="hidden md:block w-[280px]">
             <WaitlistForm compact buttonText="Join waitlist" />
           </div>
