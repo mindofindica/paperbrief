@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 type AuthMode = "magic" | "password";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +56,7 @@ export default function LoginPage() {
       }
       setStatus("success");
       setMessage("Signed in!");
-      router.push("/dashboard");
+      window.location.href = "/dashboard";
     } catch {
       setStatus("error");
       setMessage("Network error. Try again?");
