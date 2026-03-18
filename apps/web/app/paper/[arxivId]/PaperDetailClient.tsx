@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import FollowAuthorButton from '../../components/FollowAuthorButton';
 import type { Paper } from '../../../lib/arxiv-db';
 
 const TRACK_COLORS: Record<string, string> = {
@@ -315,6 +316,39 @@ function ChatPanel({ arxivId }: { arxivId: string }) {
   );
 }
 
+// ── Author list with follow buttons ───────────────────────────────────────────
+
+function AuthorList({ authorsJson }: { authorsJson: string | null }) {
+  let authors: string[] = [];
+  try {
+    const parsed = JSON.parse(authorsJson ?? '[]');
+    if (Array.isArray(parsed)) authors = parsed as string[];
+  } catch {
+    if (authorsJson) authors = [authorsJson];
+  }
+
+  if (authors.length === 0) {
+    return <p className="text-sm text-gray-400">Unknown authors</p>;
+  }
+
+  const displayAuthors = authors.slice(0, 6);
+  const rest = authors.length - displayAuthors.length;
+
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      {displayAuthors.map((name) => (
+        <span key={name} className="flex items-center gap-1.5">
+          <span className="text-sm text-gray-400">{name}</span>
+          <FollowAuthorButton authorName={name} />
+        </span>
+      ))}
+      {rest > 0 && (
+        <span className="text-xs text-gray-600">+{rest} more</span>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PaperDetailClient({ paper }: { paper: Paper }) {
@@ -449,7 +483,8 @@ export default function PaperDetailClient({ paper }: { paper: Paper }) {
               arxiv →
             </a>
           </div>
-          <p className="text-sm text-gray-400">{parseAuthors(paper.authors)}</p>
+          {/* Authors with follow buttons */}
+          <AuthorList authorsJson={paper.authors} />
         </header>
 
         <section className="bg-gray-900 border border-gray-800 rounded-xl p-5">
