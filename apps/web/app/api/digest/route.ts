@@ -16,6 +16,11 @@ import { sendDigestEmail } from '../../../lib/email/send-digest';
 import { buildUnsubscribeUrl } from '../../../lib/unsubscribe-token';
 import { scoreLabel } from '@paperbrief/core';
 import type { Digest, DigestEntry } from '@paperbrief/core';
+import {
+  getUserFeedbackProfile,
+  applyPersonalizationBonus,
+  type ScoredEntry,
+} from '../../../lib/digest-personalization';
 
 const DEDUP_DAYS = 21;
 const MAX_PAPERS_PER_DIGEST = 10;
@@ -85,7 +90,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const sentIds = new Set((recentlySent ?? []).map((r: { arxiv_id: string }) => r.arxiv_id));
 
         // Select papers for each track from Supabase
-        const entries: DigestEntry[] = [];
+        const entries: ScoredEntry[] = [];
 
         for (const track of userTracks) {
           if (entries.length >= MAX_PAPERS_PER_DIGEST) break;
@@ -120,6 +125,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               reason: `Matched track: ${track.name}`,
               absUrl: `https://arxiv.org/abs/${p.arxiv_id}`,
               trackName: track.name,
+              categories: p.categories ?? [],
             });
             sentIds.add(p.arxiv_id); // prevent cross-track dupes in same digest
           }
@@ -127,14 +133,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         if (!entries.length) continue;
 
+        // Apply feedback-driven personalisation (re-rank + skip filter)
+        // Non-fatal: on any error the original order is preserved.
+        let rankedEntries: ScoredEntry[] = entries;
+        try {
+          const feedbackProfile = await getUserFeedbackProfile(userId, supabase);
+          rankedEntries = applyPersonalizationBonus(entries, feedbackProfile);
+          if (feedbackProfile.hasFeedback) {
+            console.log(
+              `[digest] Personalised ${rankedEntries.length} entries for user ${userId} ` +
+              `(${entries.length - rankedEntries.length} skipped papers filtered)`
+            );
+          }
+        } catch (personalizationErr) {
+          console.warn('[digest] Personalisation failed for', userId, personalizationErr);
+          rankedEntries = entries;
+        }
+
+        if (!rankedEntries.length) continue;
+
+        // Strip internal categories field before building Digest / sending email
+        const digestEntries: DigestEntry[] = rankedEntries.map(({ categories: _cats, ...e }) => e);
+
         // Build digest object
         const digest: Digest = {
           userId,
           weekOf: todayIso(),
-          entries,
-          tracksIncluded: [...new Set(entries.map((e) => e.trackName))],
+          entries: digestEntries,
+          tracksIncluded: [...new Set(digestEntries.map((e) => e.trackName))],
           totalPapersScanned: entries.length,
-          totalPapersIncluded: entries.length,
+          totalPapersIncluded: digestEntries.length,
           generatedAt: new Date().toISOString(),
         };
 
@@ -152,13 +180,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         await supabase.from('deliveries').insert({
           user_id: userId,
           week_of: today,
-          papers_sent: entries.length,
+          papers_sent: digestEntries.length,
           channels: ['email'],
         });
 
         // Record each sent paper for dedup (using track column to store userId)
         await supabase.from('paper_digest_entries').insert(
-          entries.map((e) => ({
+          digestEntries.map((e) => ({
             date: today,
             arxiv_id: e.arxivId,
             track: userId,
