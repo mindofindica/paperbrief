@@ -47,10 +47,13 @@ export default function ReadingListClient({
   const lists: Record<string, Paper[]> = { all, unread, reading, done };
   const items = lists[activeTab] || [];
 
-  // Build the BibTeX export URL — filtered to the active tab when not "all"
+  // Build the export URLs — filtered to the active tab when not "all"
   const bibUrl = activeTab === 'all'
     ? '/api/reading-list/bibtex'
     : `/api/reading-list/bibtex?status=${activeTab}`;
+  const mdUrl = activeTab === 'all'
+    ? '/api/reading-list/markdown'
+    : `/api/reading-list/markdown?status=${activeTab}`;
 
   return (
     <div className="space-y-4">
@@ -72,17 +75,28 @@ export default function ReadingListClient({
           ))}
         </div>
 
-        {/* BibTeX export — only show when there are papers to export */}
+        {/* Export buttons — only show when there are papers to export */}
         {all.length > 0 && (
-          <a
-            href={bibUrl}
-            download
-            className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 border border-gray-800 hover:border-gray-700 rounded-md px-3 py-1.5 transition-all duration-200"
-            title={`Export ${activeTab === 'all' ? 'all' : activeTab} papers as BibTeX`}
-          >
-            <span>📄</span>
-            <span>Export .bib</span>
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href={bibUrl}
+              download
+              className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 border border-gray-800 hover:border-gray-700 rounded-md px-3 py-1.5 transition-all duration-200"
+              title={`Export ${activeTab === 'all' ? 'all' : activeTab} papers as BibTeX`}
+            >
+              <span>📄</span>
+              <span>Export .bib</span>
+            </a>
+            <a
+              href={mdUrl}
+              download
+              className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 border border-gray-800 hover:border-gray-700 rounded-md px-3 py-1.5 transition-all duration-200"
+              title={`Export ${activeTab === 'all' ? 'all' : activeTab} papers as Markdown`}
+            >
+              <span>📝</span>
+              <span>Export .md</span>
+            </a>
+          </div>
         )}
       </div>
 
