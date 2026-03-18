@@ -448,4 +448,121 @@ describe('digest route — followed author papers integration', () => {
     const result = shortAbstract.slice(0, 300) + (shortAbstract.length > 300 ? '…' : '');
     expect(result).toBe('Short abstract.');
   });
+
+  it('does not add ellipsis to abstracts exactly 300 chars', () => {
+    const exactAbstract = 'z'.repeat(300);
+    const result = exactAbstract.slice(0, 300) + (exactAbstract.length > 300 ? '…' : '');
+    expect(result).toHaveLength(300);
+    expect(result.endsWith('…')).toBe(false);
+  });
+
+  it('scoreLabel: score >= 5 is Essential', () => {
+    const { scoreLabel } = require('@paperbrief/core');
+    expect(scoreLabel(5)).toBe('🔥 Essential');
+    expect(scoreLabel(6)).toBe('🔥 Essential');
+  });
+
+  it('scoreLabel: score >= 4 is Relevant', () => {
+    const { scoreLabel } = require('@paperbrief/core');
+    expect(scoreLabel(4)).toBe('⭐ Relevant');
+    expect(scoreLabel(4.9)).toBe('⭐ Relevant');
+  });
+
+  it('scoreLabel: score >= 3 is Worth a look', () => {
+    const { scoreLabel } = require('@paperbrief/core');
+    expect(scoreLabel(3)).toBe('📌 Worth a look');
+  });
+
+  it('scoreLabel: score < 3 is Marginal', () => {
+    const { scoreLabel } = require('@paperbrief/core');
+    expect(scoreLabel(2)).toBe('· Marginal');
+    expect(scoreLabel(1)).toBe('· Marginal');
+  });
+
+  it('uses MIN_LLM_SCORE fallback when llm_score is null', () => {
+    const MIN_LLM_SCORE = 3;
+    const paper = makeAuthorPaper({ llm_score: null as unknown as number });
+    const score = paper.llm_score ?? MIN_LLM_SCORE;
+    expect(score).toBe(3);
+  });
+
+  it('builds absUrl from arxiv_id correctly', () => {
+    const paper = makeAuthorPaper({ arxiv_id: '2501.99887' });
+    const absUrl = `https://arxiv.org/abs/${paper.arxiv_id}`;
+    expect(absUrl).toBe('https://arxiv.org/abs/2501.99887');
+  });
+
+  it('reason field preserves exact matched_author casing', () => {
+    const paper = makeAuthorPaper({ matched_author: 'Andrej Karpathy' });
+    const reason = `From author you follow: ${paper.matched_author}`;
+    expect(reason).toBe('From author you follow: Andrej Karpathy');
+  });
+
+  it('formatAuthors: 2 authors joined with & in route helper', () => {
+    // The route's local formatAuthors (not core's) uses "&" for exactly 2 authors
+    function formatAuthors(authors: string[]): string {
+      if (!authors.length) return '';
+      if (authors.length === 1) return authors[0]!;
+      if (authors.length === 2) return authors.join(' & ');
+      return `${authors[0]} et al.`;
+    }
+    expect(formatAuthors(['Alice', 'Bob'])).toBe('Alice & Bob');
+  });
+
+  it('formatAuthors: 4+ authors still uses et al.', () => {
+    function formatAuthors(authors: string[]): string {
+      if (!authors.length) return '';
+      if (authors.length === 1) return authors[0]!;
+      if (authors.length === 2) return authors.join(' & ');
+      return `${authors[0]} et al.`;
+    }
+    expect(formatAuthors(['Alice', 'Bob', 'Carol', 'Dave'])).toBe('Alice et al.');
+  });
+
+  it('all followed papers up to cap are added to sentIds', () => {
+    const MAX_FOLLOWED_PAPERS = 3;
+    const sentIds = new Set<string>();
+    const followedPapers = [
+      makeAuthorPaper({ arxiv_id: 'fp.a' }),
+      makeAuthorPaper({ arxiv_id: 'fp.b' }),
+      makeAuthorPaper({ arxiv_id: 'fp.c' }),
+      makeAuthorPaper({ arxiv_id: 'fp.d' }), // beyond cap
+    ];
+
+    followedPapers
+      .filter((p) => !sentIds.has(p.arxiv_id))
+      .slice(0, MAX_FOLLOWED_PAPERS)
+      .forEach((p) => sentIds.add(p.arxiv_id));
+
+    expect(sentIds.has('fp.a')).toBe(true);
+    expect(sentIds.has('fp.b')).toBe(true);
+    expect(sentIds.has('fp.c')).toBe(true);
+    // fp.d excluded by cap — should not be in sentIds
+    expect(sentIds.has('fp.d')).toBe(false);
+  });
+
+  it('when all followed papers are already in sentIds, section is empty', () => {
+    const sentIds = new Set(['fp.001', 'fp.002', 'fp.003']);
+    const followedPapers = [
+      makeAuthorPaper({ arxiv_id: 'fp.001' }),
+      makeAuthorPaper({ arxiv_id: 'fp.002' }),
+      makeAuthorPaper({ arxiv_id: 'fp.003' }),
+    ];
+
+    const filtered = followedPapers.filter((p) => !sentIds.has(p.arxiv_id));
+    expect(filtered).toHaveLength(0);
+    // Route: followedAuthorPapers.length === 0 → passes undefined
+    const toPass = filtered.length ? filtered : undefined;
+    expect(toPass).toBeUndefined();
+  });
+
+  it('track-paper ids appear in sentIds before followed-paper dedup runs', () => {
+    // Ensures a paper can't appear in both sections
+    const trackEntry = makeDigestEntry({ arxivId: 'shared.paper' });
+    const sentIds = new Set<string>([trackEntry.arxivId]); // seeded from track entries
+    const followedPapers = [makeAuthorPaper({ arxiv_id: 'shared.paper' })];
+
+    const filtered = followedPapers.filter((p) => !sentIds.has(p.arxiv_id));
+    expect(filtered).toHaveLength(0);
+  });
 });
