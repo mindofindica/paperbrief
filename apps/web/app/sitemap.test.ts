@@ -64,7 +64,7 @@ describe('sitemap()', () => {
     expect(urls).toContain('https://paperbrief.ai/pricing');
     expect(urls).toContain('https://paperbrief.ai/stats');
     expect(urls).toContain('https://paperbrief.ai/rss');
-    expect(entries.length).toBe(6);
+    expect(entries.length).toBe(6 + 13);
   });
 
   it('assigns priority 1.0 to homepage', async () => {
@@ -95,7 +95,7 @@ describe('sitemap()', () => {
     mockGetSitemapPapers.mockResolvedValue(papers);
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    expect(entries.length).toBe(6 + 3);
+    expect(entries.length).toBe(6 + 13 + 3);
     for (const paper of papers) {
       expect(entries.some((e) => e.url.includes(paper.arxiv_id))).toBe(true);
     }
@@ -107,7 +107,7 @@ describe('sitemap()', () => {
     ]);
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    const paperUrl = entries.find((e) => e.url.includes('cs'));
+    const paperUrl = entries.find((e) => e.url.includes('/paper/'));
     expect(paperUrl?.url).toBe('https://paperbrief.ai/paper/cs%2F0312045');
   });
 
@@ -152,7 +152,7 @@ describe('sitemap()', () => {
     });
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    expect(entries.length).toBe(6);
+    expect(entries.length).toBe(6 + 13);
     expect(entries.every((e) => !e.url.includes('/paper/'))).toBe(true);
   });
 
@@ -179,7 +179,7 @@ describe('sitemap()', () => {
     mockGetSitemapPapers.mockResolvedValue(makePapers(500));
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    expect(entries.length).toBe(6 + 500);
+    expect(entries.length).toBe(6 + 13 + 500);
   });
 
   it('does not produce duplicate URLs', async () => {

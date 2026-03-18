@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { getSitemapPapers } from '../lib/arxiv-db';
+import { getAllTopics } from '../lib/topics';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://paperbrief.ai';
 
@@ -66,5 +67,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     paperRoutes = [];
   }
 
-  return [...STATIC_ROUTES, ...paperRoutes];
+  // Topic routes
+  const topicRoutes: MetadataRoute.Sitemap = [
+    {
+      url: `${SITE_URL}/topics`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    ...getAllTopics().map((topic) => ({
+      url: `${SITE_URL}/topics/${topic.slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    })),
+  ];
+
+  return [...STATIC_ROUTES, ...topicRoutes, ...paperRoutes];
 }
