@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import FollowAuthorButton from '../../components/FollowAuthorButton';
 import type { Paper } from '../../../lib/arxiv-db';
+import AddToCollectionButton from '../../components/AddToCollectionButton';
 
 const TRACK_COLORS: Record<string, string> = {
   'cs.AI': 'bg-blue-900/60 text-blue-200',
@@ -545,7 +546,7 @@ export default function PaperDetailClient({ paper }: { paper: Paper }) {
           </div>
         </section>
 
-        <section>
+        <section className="flex flex-wrap gap-3 items-center">
           <button
             onClick={toggleReadingList}
             disabled={isReadingListLoading}
@@ -557,6 +558,13 @@ export default function PaperDetailClient({ paper }: { paper: Paper }) {
                 ? 'Remove from Reading List'
                 : 'Add to Reading List'}
           </button>
+          <AddToCollectionButton
+            arxivId={paper.arxiv_id}
+            title={paper.title}
+            authors={paper.authors}
+            abstract={paper.abstract}
+            publishedAt={paper.published_at}
+          />
         </section>
       </main>
     </div>

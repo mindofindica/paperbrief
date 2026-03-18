@@ -16,6 +16,7 @@ const NAV_LINKS: NavLink[] = [
   { href: '/recommend', label: 'Recommend', exact: true },
   { href: '/reading-list', label: 'Reading List', exact: true },
   { href: '/following', label: 'Following', exact: true },
+  { href: '/collections', label: 'Collections', exact: true },
   { href: '/stats', label: 'Stats', exact: true },
   { href: '/settings', label: '⚙️', exact: true },
 ];
