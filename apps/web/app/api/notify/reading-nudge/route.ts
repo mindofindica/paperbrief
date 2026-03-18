@@ -16,9 +16,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '../../../lib/supabase';
-import { sendReadingNudgeEmail } from '../../../lib/email/send-reading-nudge';
-import type { NudgePaper } from '../../../lib/email/templates/reading-nudge';
+import { getServiceSupabase } from '../../../../lib/supabase';
+import { sendReadingNudgeEmail } from '../../../../lib/email/send-reading-nudge';
+import type { NudgePaper } from '../../../../lib/email/templates/reading-nudge';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,11 +157,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       if (result.ok) {
         sent++;
-      } else if (result.skipped) {
-        skipped++;
       } else {
-        errors++;
-        console.error('[reading-nudge] Failed to send to', candidate.email, result.error);
+        const failResult = result as { ok: false; error: string; skipped?: boolean };
+        if (failResult.skipped) {
+          skipped++;
+        } else {
+          errors++;
+          console.error('[reading-nudge] Failed to send to', candidate.email, failResult.error);
+        }
       }
     }
 

@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
   const validated = validateAuthorName(rawName);
   if (!validated.ok) {
-    return NextResponse.json({ error: validated.error }, { status: 400 });
+    return NextResponse.json({ error: (validated as { ok: false; error: string }).error }, { status: 400 });
   }
   const authorName = validated.name;
 

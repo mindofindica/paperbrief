@@ -17,12 +17,12 @@ import { NextRequest } from 'next/server';
 
 const mockFrom = vi.fn();
 
-vi.mock('../../../lib/supabase', () => ({
+vi.mock('../../../../lib/supabase', () => ({
   getServiceSupabase: () => ({ from: mockFrom }),
 }));
 
 const mockSendReadingNudgeEmail = vi.fn();
-vi.mock('../../../lib/email/send-reading-nudge', () => ({
+vi.mock('../../../../lib/email/send-reading-nudge', () => ({
   sendReadingNudgeEmail: (...args: unknown[]) => mockSendReadingNudgeEmail(...args),
 }));
 
