@@ -47,6 +47,11 @@ export interface SendDigestOptions {
    * Typically: process.env.NEXT_PUBLIC_APP_URL or "https://paperbrief.ai"
    */
   feedbackBaseUrl?: string;
+  /**
+   * Papers from authors the user follows — rendered as a separate section
+   * below the track-based papers. Optional; omit to hide the section.
+   */
+  followedAuthorPapers?: import('@paperbrief/core').DigestEntry[];
 }
 
 /**
@@ -56,7 +61,7 @@ export interface SendDigestOptions {
  * local dev / CI where the key isn't present.
  */
 export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResult> {
-  const { to, digest, unsubscribeUrl, dashboardUrl, from, feedbackBaseUrl } = opts;
+  const { to, digest, unsubscribeUrl, dashboardUrl, from, feedbackBaseUrl, followedAuthorPapers } = opts;
 
   const resend = getResendClient();
   if (!resend) {
@@ -88,6 +93,7 @@ export async function sendDigestEmail(opts: SendDigestOptions): Promise<SendResu
         unsubscribeUrl,
         dashboardUrl,
         feedbackUrls,
+        followedAuthorPapers,
       }),
     });
 
