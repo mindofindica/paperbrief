@@ -83,5 +83,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  return [...STATIC_ROUTES, ...topicRoutes, ...paperRoutes];
+  // RSS feed directory page (human-readable)
+  const rssRoutes: MetadataRoute.Sitemap = [
+    {
+      url: `${SITE_URL}/rss-feeds`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.5,
+    },
+  ];
+
+  return [...STATIC_ROUTES, ...topicRoutes, ...rssRoutes, ...paperRoutes];
 }
