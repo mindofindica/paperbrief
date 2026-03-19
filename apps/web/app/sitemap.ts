@@ -22,6 +22,12 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
     priority: 0.9,
   },
   {
+    url: `${SITE_URL}/today`,
+    lastModified: new Date(),
+    changeFrequency: 'daily',
+    priority: 0.9,
+  },
+  {
     url: `${SITE_URL}/search`,
     lastModified: new Date(),
     changeFrequency: 'weekly',
