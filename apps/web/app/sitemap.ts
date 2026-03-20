@@ -51,6 +51,12 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
     changeFrequency: 'daily',
     priority: 0.5,
   },
+  {
+    url: `${SITE_URL}/rss/daily`,
+    lastModified: new Date(),
+    changeFrequency: 'daily',
+    priority: 0.5,
+  },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

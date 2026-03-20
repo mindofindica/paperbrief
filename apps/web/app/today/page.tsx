@@ -45,6 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     alternates: {
       canonical: `${SITE_URL}/today`,
+      types: {
+        'application/rss+xml': `${SITE_URL}/rss/daily`,
+      },
     },
     robots: {
       index: true,
@@ -204,6 +207,8 @@ export default async function TodayPage() {
           <a href="/trending" className="hover:text-gray-400 transition-colors">Trending</a>
           {' · '}
           <a href="/rss" className="hover:text-gray-400 transition-colors">RSS</a>
+          {' · '}
+          <a href="/rss/daily" className="hover:text-gray-400 transition-colors">Daily RSS</a>
           {' · '}
           Papers from{' '}
           <a href="https://arxiv.org" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">arXiv</a>

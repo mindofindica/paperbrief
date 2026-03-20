@@ -142,6 +142,19 @@ export default function RssIndexPage() {
           />
         </section>
 
+        {/* Paper of the Day feed */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Paper of the Day
+          </h2>
+          <FeedRow
+            href={`${SITE_URL}/rss/daily`}
+            title="📅 Daily Pick — one paper per day"
+            description="The single highest-scored ML/AI paper for each calendar day. Zero noise — just today's best, every day."
+            badge="New"
+          />
+        </section>
+
         {/* Topic feeds */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
