@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
-import { getSitemapPapers } from '../lib/arxiv-db';
+import { getSitemapPapers, getSitemapAuthors } from '../lib/arxiv-db';
+import { authorNameToSlug } from '../lib/author-pages';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://paperbrief.ai';
 
@@ -49,6 +50,7 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Fetch scored papers from the last 180 days (cap at 5 000 URLs)
   let paperRoutes: MetadataRoute.Sitemap = [];
+  let authorRoutes: MetadataRoute.Sitemap = [];
 
   try {
     const papers = await getSitemapPapers(180, 5000);
@@ -66,5 +68,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     paperRoutes = [];
   }
 
-  return [...STATIC_ROUTES, ...paperRoutes];
+  try {
+    // Author pages: unique authors from the last 180 days (cap at 2 000 authors)
+    const authors = await getSitemapAuthors(180, 2000);
+
+    // Deduplicate slugs (e.g. "J. Bengio" + "Yoshua Bengio" → same slug possible)
+    const seen = new Set<string>();
+    authorRoutes = authors
+      .map((name) => authorNameToSlug(name))
+      .filter((slug) => {
+        if (!slug || seen.has(slug)) return false;
+        seen.add(slug);
+        return true;
+      })
+      .map((slug) => ({
+        url: `${SITE_URL}/author/${slug}`,
+        lastModified: new Date(),
+        changeFrequency: 'weekly' as const,
+        priority: 0.5,
+      }));
+  } catch {
+    authorRoutes = [];
+  }
+
+  return [...STATIC_ROUTES, ...paperRoutes, ...authorRoutes];
 }

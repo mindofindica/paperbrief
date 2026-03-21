@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import FollowAuthorButton from '../../components/FollowAuthorButton';
 import type { Paper } from '../../../lib/arxiv-db';
 import AddToCollectionButton from '../../components/AddToCollectionButton';
+import { authorNameToSlug } from '../../../lib/author-pages';
 
 const TRACK_COLORS: Record<string, string> = {
   'cs.AI': 'bg-blue-900/60 text-blue-200',
@@ -339,7 +340,13 @@ function AuthorList({ authorsJson }: { authorsJson: string | null }) {
     <div className="flex flex-wrap gap-2 items-center">
       {displayAuthors.map((name) => (
         <span key={name} className="flex items-center gap-1.5">
-          <span className="text-sm text-gray-400">{name}</span>
+          <Link
+            href={`/author/${encodeURIComponent(authorNameToSlug(name))}`}
+            className="text-sm text-gray-400 hover:text-blue-400 transition-colors"
+            title={`View papers by ${name}`}
+          >
+            {name}
+          </Link>
           <FollowAuthorButton authorName={name} />
         </span>
       ))}
