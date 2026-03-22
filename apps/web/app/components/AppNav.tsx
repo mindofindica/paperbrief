@@ -12,6 +12,7 @@ interface NavLink {
 
 const NAV_LINKS: NavLink[] = [
   { href: '/digest', label: 'Digest' },
+  { href: '/daily', label: 'Daily' },
   { href: '/search', label: 'Search', exact: true },
   { href: '/recommend', label: 'Recommend', exact: true },
   { href: '/reading-list', label: 'Reading List', exact: true },

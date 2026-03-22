@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { getSitemapPapers } from '../lib/arxiv-db';
+import { getDailyDigestDates } from '../lib/daily-digest';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://paperbrief.ai';
 
@@ -47,7 +48,22 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Fetch scored papers from the last 180 days (cap at 5 000 URLs)
+  // /daily/[date] entries — last 90 days
+  let dailyRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const dates = await getDailyDigestDates(90);
+    const today = new Date().toISOString().slice(0, 10);
+    dailyRoutes = dates.map(({ date }) => ({
+      url: `${SITE_URL}/daily/${date}`,
+      lastModified: new Date(`${date}T12:00:00Z`),
+      changeFrequency: date === today ? ('hourly' as const) : ('never' as const),
+      priority: 0.8,
+    }));
+  } catch {
+    dailyRoutes = [];
+  }
+
+  // /paper/[arxivId] entries — last 180 days (cap at 5 000 URLs)
   let paperRoutes: MetadataRoute.Sitemap = [];
 
   try {
@@ -66,5 +82,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     paperRoutes = [];
   }
 
-  return [...STATIC_ROUTES, ...paperRoutes];
+  return [...STATIC_ROUTES, ...dailyRoutes, ...paperRoutes];
 }
