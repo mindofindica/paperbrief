@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: Test & Type-check
+    runs-on: ubuntu-latest
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+      NEXT_PUBLIC_SITE_URL: https://paperbrief.ai
+      RESEND_API_KEY: test-resend-key
+      OPENAI_API_KEY: test-openai-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('apps/web/**/*.ts', 'apps/web/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Run web tests with GitHub annotations + JSON output for summary
+      - name: Run web tests
+        id: web_tests
+        working-directory: apps/web
+        run: |
+          npx vitest run \
+            --reporter=verbose \
+            --reporter=github-actions \
+            --reporter=json \
+            --outputFile=../../test-results-web.json
+
+      # Run core package tests
+      - name: Run core tests
+        id: core_tests
+        working-directory: packages/core
+        run: |
+          npx vitest run \
+            --reporter=verbose \
+            --reporter=github-actions
+
+      - name: Write test summary
+        if: always()
+        run: |
+          node -e "
+            const fs = require('fs');
+            const summary = process.env.GITHUB_STEP_SUMMARY;
+            const lines = ['## 🧪 Test Results', ''];
+            try {
+              const r = JSON.parse(fs.readFileSync('test-results-web.json', 'utf8'));
+              const passed = r.numPassedTests ?? 0;
+              const failed = r.numFailedTests ?? 0;
+              const total = r.numTotalTests ?? 0;
+              const files = r.numTotalTestSuites ?? 0;
+              const icon = failed > 0 ? '❌' : '✅';
+              lines.push(\`### Web App (\${files} suites)\`);
+              lines.push(\`\${icon} \${passed} passed / \${failed} failed / \${total} total\`);
+              if (failed > 0) {
+                lines.push('', '**Failed:**');
+                (r.testResults ?? []).forEach(suite => {
+                  const failures = (suite.assertionResults ?? []).filter(t => t.status === 'failed');
+                  if (failures.length) {
+                    const file = suite.testFilePath.split('/').slice(-2).join('/');
+                    failures.forEach(t => lines.push(\`- \\\`\${file}\\\` → \${t.fullName}\`));
+                  }
+                });
+              }
+            } catch (e) {
+              lines.push('⚠️ Could not read web test results');
+            }
+            lines.push('');
+            fs.appendFileSync(summary, lines.join('\n') + '\n');
+          "
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
