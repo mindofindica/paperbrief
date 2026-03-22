@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getPaper } from '../../../lib/arxiv-db';
 import PaperDetailClient from './PaperDetailClient';
+import { paperToJsonLd, paperBreadcrumbJsonLd } from '../../../lib/structured-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,5 +97,40 @@ export default async function PaperDetailPage({
     );
   }
 
-  return <PaperDetailClient paper={paper} />;
+  // Parse authors for JSON-LD
+  let authorsArray: string[] = [];
+  try {
+    const parsed = JSON.parse(paper.authors ?? '[]');
+    if (Array.isArray(parsed)) authorsArray = parsed as string[];
+  } catch {
+    if (paper.authors) authorsArray = [paper.authors];
+  }
+
+  const articleJsonLd = paperToJsonLd({
+    title: paper.title,
+    authors: authorsArray,
+    abstract: paper.abstract ?? '',
+    publishedDate: paper.published_at ?? undefined,
+    arxivId: paper.arxiv_id,
+    llmScore: paper.llm_score ?? undefined,
+  });
+
+  const breadcrumbJsonLd = paperBreadcrumbJsonLd({
+    title: paper.title,
+    arxivId: paper.arxiv_id,
+  });
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <PaperDetailClient paper={paper} />
+    </>
+  );
 }
