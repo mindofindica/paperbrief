@@ -6,6 +6,7 @@
  */
 
 import { getAvailableTracks } from '../../lib/arxiv-db';
+import { getAllTopics } from '../../lib/topics';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,8 @@ export default function RssIndexPage() {
   } catch {
     // DB unavailable — still render page with just the full feed
   }
+
+  const topics = getAllTopics();
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -137,6 +140,42 @@ export default function RssIndexPage() {
             description="Every high-scored paper across all research tracks, sorted by relevance."
             badge="Recommended"
           />
+        </section>
+
+        {/* Paper of the Day feed */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Paper of the Day
+          </h2>
+          <FeedRow
+            href={`${SITE_URL}/rss/daily`}
+            title="📅 Daily Pick — one paper per day"
+            description="The single highest-scored ML/AI paper for each calendar day. Zero noise — just today's best, every day."
+            badge="New"
+          />
+        </section>
+
+        {/* Topic feeds */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            Research topics
+          </h2>
+          <p className="text-gray-500 text-sm">
+            12 curated topic feeds — subscribe in your RSS reader without signing up.
+          </p>
+          <div className="space-y-2">
+            {topics.map((topic) => {
+              const feedUrl = `${SITE_URL}/rss/topics/${topic.slug}`;
+              return (
+                <FeedRow
+                  key={topic.slug}
+                  href={feedUrl}
+                  title={`${topic.emoji} ${topic.name}`}
+                  description={topic.description}
+                />
+              );
+            })}
+          </div>
         </section>
 
         {/* Per-track feeds */}

@@ -6,6 +6,7 @@
 import { createClient } from "@supabase/supabase-js";
 import WaitlistForm from "./components/WaitlistForm";
 import SampleDigest from "./components/SampleDigest";
+import { getPaperOfTheDay, formatAuthors, getScoreBadge } from "../lib/today";
 
 export const revalidate = 3600; // ISR: revalidate waitlist count every hour
 
@@ -25,7 +26,10 @@ async function getWaitlistCount(): Promise<number | null> {
 }
 
 export default async function LandingPage() {
-  const waitlistCount = await getWaitlistCount();
+  const [waitlistCount, todayPaper] = await Promise.all([
+    getWaitlistCount(),
+    getPaperOfTheDay(),
+  ]);
 
   // Social proof text — only show when count > 0
   const socialProof =
@@ -39,7 +43,9 @@ export default async function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <span className="font-bold text-xl text-gray-900">📄 PaperBrief</span>
         <div className="flex items-center gap-4">
+          <a href="/today" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline font-medium">Today</a>
           <a href="/trending" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Trending</a>
+          <a href="/topics" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Topics</a>
           <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</a>
           <a href="/auth/login" className="text-sm font-medium text-gray-900 hover:text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:border-gray-400 transition-colors">Sign in</a>
           <div className="hidden md:block w-[280px]">
@@ -137,6 +143,59 @@ export default async function LandingPage() {
           See what's trending live →
         </a>
       </div>
+
+      {/* ── Today's Top Paper ── */}
+      <section className="py-16 px-6 border-t border-gray-100">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center gap-3 mb-5">
+            <span className="text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full">
+              📄 Paper of the Day
+            </span>
+            <span className="text-xs text-gray-400">Updated daily · arXiv's top ML paper</span>
+          </div>
+
+          {todayPaper ? (() => {
+            const badge = getScoreBadge(todayPaper.llmScore);
+            const { displayed, extra } = formatAuthors(todayPaper.authors);
+            return (
+              <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full">
+                    {badge.emoji} {badge.label} · {todayPaper.llmScore.toFixed(1)}
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 leading-snug">
+                  <a href="/today" className="hover:text-blue-600 transition-colors">
+                    {todayPaper.title}
+                  </a>
+                </h3>
+                <p className="text-sm text-gray-500 mb-3">
+                  {displayed.join(', ')}
+                  {extra > 0 && <span className="text-gray-400"> +{extra} more</span>}
+                </p>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  {todayPaper.abstract.slice(0, 250)}...
+                </p>
+                <a
+                  href="/today"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                >
+                  Read today's paper →
+                </a>
+              </div>
+            );
+          })() : (
+            <div className="border border-dashed border-gray-200 rounded-xl p-6 text-center">
+              <p className="text-sm text-gray-500 mb-3">
+                Every day, PaperBrief selects the highest-scoring ML paper from arXiv.
+              </p>
+              <a href="/today" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                See today's paper →
+              </a>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* ── Pricing ── */}
       <section className="bg-gray-50 py-20 px-6">

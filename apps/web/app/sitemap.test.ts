@@ -53,18 +53,20 @@ describe('sitemap()', () => {
 
   // ── static routes ──────────────────────────────────────────────────────────
 
-  it('returns the 6 static routes', async () => {
+  it('returns the 8 static routes', async () => {
     mockGetSitemapPapers.mockResolvedValue([]);
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
     const urls = entries.map((e) => e.url);
     expect(urls).toContain('https://paperbrief.ai');
     expect(urls).toContain('https://paperbrief.ai/trending');
+    expect(urls).toContain('https://paperbrief.ai/today');
     expect(urls).toContain('https://paperbrief.ai/search');
     expect(urls).toContain('https://paperbrief.ai/pricing');
     expect(urls).toContain('https://paperbrief.ai/stats');
     expect(urls).toContain('https://paperbrief.ai/rss');
-    expect(entries.length).toBe(6);
+    expect(urls).toContain('https://paperbrief.ai/rss/daily');
+    expect(entries.length).toBe(8 + 13 + 1);
   });
 
   it('assigns priority 1.0 to homepage', async () => {
@@ -95,7 +97,7 @@ describe('sitemap()', () => {
     mockGetSitemapPapers.mockResolvedValue(papers);
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    expect(entries.length).toBe(6 + 3);
+    expect(entries.length).toBe(8 + 13 + 1 + 3);
     for (const paper of papers) {
       expect(entries.some((e) => e.url.includes(paper.arxiv_id))).toBe(true);
     }
@@ -107,7 +109,7 @@ describe('sitemap()', () => {
     ]);
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    const paperUrl = entries.find((e) => e.url.includes('cs'));
+    const paperUrl = entries.find((e) => e.url.includes('/paper/'));
     expect(paperUrl?.url).toBe('https://paperbrief.ai/paper/cs%2F0312045');
   });
 
@@ -152,7 +154,7 @@ describe('sitemap()', () => {
     });
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    expect(entries.length).toBe(6);
+    expect(entries.length).toBe(8 + 13 + 1);
     expect(entries.every((e) => !e.url.includes('/paper/'))).toBe(true);
   });
 
@@ -179,7 +181,7 @@ describe('sitemap()', () => {
     mockGetSitemapPapers.mockResolvedValue(makePapers(500));
     const { default: sitemap } = await import('./sitemap');
     const entries = await sitemap();
-    expect(entries.length).toBe(6 + 500);
+    expect(entries.length).toBe(8 + 13 + 1 + 500);
   });
 
   it('does not produce duplicate URLs', async () => {
