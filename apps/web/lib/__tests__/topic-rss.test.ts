@@ -35,8 +35,8 @@ import {
   clamp,
   buildItem,
   buildFeed,
-  GET,
-} from '../../app/rss/topics/[slug]/route';
+} from '../rss-helpers';
+import { GET } from '../../app/rss/topics/[slug]/route';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
