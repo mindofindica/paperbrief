@@ -868,6 +868,49 @@ export async function getSitemapPapers(
   }));
 }
 
+/**
+ * Returns a deduplicated list of author names from papers published within
+ * the last `daysBack` days. Used to generate author profile URLs in the sitemap.
+ *
+ * Authors are stored as JSONB arrays in Supabase. We query the raw authors
+ * field and flatten the arrays client-side.
+ *
+ * @param daysBack - lookback window in days (default 180)
+ * @param limit    - max author names to return (default 2000)
+ */
+export async function getSitemapAuthors(
+  daysBack = 180,
+  limit = 2000,
+): Promise<string[]> {
+  const supabase = getServiceSupabase();
+  const since = new Date(Date.now() - daysBack * 86400_000).toISOString().slice(0, 10);
+
+  // Fetch authors arrays from recent papers. Limit to 5k papers to keep response small.
+  const { data, error } = await supabase
+    .from('papers')
+    .select('authors')
+    .gte('published_at', since)
+    .limit(5000);
+
+  if (error || !data) return [];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const row of data as { authors: unknown }[]) {
+    const authors = Array.isArray(row.authors) ? row.authors : [];
+    for (const name of authors as string[]) {
+      if (typeof name === 'string' && name.length > 1 && !seen.has(name)) {
+        seen.add(name);
+        result.push(name);
+        if (result.length >= limit) return result;
+      }
+    }
+  }
+
+  return result;
+}
+
 export function closeDb(): void {
   if (_db) {
     _db.close();

@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
-import { getSitemapPapers } from '../lib/arxiv-db';
+import { getSitemapPapers, getSitemapAuthors } from '../lib/arxiv-db';
 import { getDailyDigestDates } from '../lib/daily-digest';
 import { getAllTopics } from '../lib/topics';
+import { authorNameToSlug } from '../lib/author-pages';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://paperbrief.ai';
 
@@ -78,10 +79,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // /paper/[arxivId] entries — last 180 days (cap at 5 000 URLs)
   let paperRoutes: MetadataRoute.Sitemap = [];
-
   try {
     const papers = await getSitemapPapers(180, 5000);
-
     paperRoutes = papers.map((paper) => ({
       url: `${SITE_URL}/paper/${encodeURIComponent(paper.arxiv_id)}`,
       lastModified: paper.published_at
@@ -91,8 +90,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
   } catch {
-    // DB unavailable at build time (e.g. during static analysis) — omit paper URLs
     paperRoutes = [];
+  }
+
+  // /author/[slug] entries — up to 2,000 authors from last 180 days
+  let authorRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const authors = await getSitemapAuthors(180, 2000);
+    const seen = new Set<string>();
+    authorRoutes = authors
+      .map((name) => authorNameToSlug(name))
+      .filter((slug) => {
+        if (!slug || seen.has(slug)) return false;
+        seen.add(slug);
+        return true;
+      })
+      .map((slug) => ({
+        url: `${SITE_URL}/author/${slug}`,
+        lastModified: new Date(),
+        changeFrequency: 'weekly' as const,
+        priority: 0.5,
+      }));
+  } catch {
+    authorRoutes = [];
   }
 
   // Topic routes
@@ -111,7 +131,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  // RSS feed directory page (human-readable)
+  // RSS feed directory page
   const rssRoutes: MetadataRoute.Sitemap = [
     {
       url: `${SITE_URL}/rss-feeds`,
@@ -121,5 +141,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return [...STATIC_ROUTES, ...topicRoutes, ...rssRoutes, ...dailyRoutes, ...paperRoutes];
+  return [...STATIC_ROUTES, ...topicRoutes, ...rssRoutes, ...dailyRoutes, ...paperRoutes, ...authorRoutes];
 }
