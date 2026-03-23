@@ -29,18 +29,6 @@ interface DigestEntry {
  * If current UTC time is before 07:30, next run is today at 07:30 UTC.
  * Otherwise next run is tomorrow at 07:30 UTC.
  */
-function getNextDigestTime(now: Date = new Date()): Date {
-  const RUN_HOUR_UTC = 7;
-  const RUN_MIN_UTC = 30;
-
-  const todayRun = new Date(now);
-  todayRun.setUTCHours(RUN_HOUR_UTC, RUN_MIN_UTC, 0, 0);
-
-  return now < todayRun
-    ? todayRun
-    : new Date(todayRun.getTime() + 24 * 60 * 60 * 1000);
-}
-
 export default async function DigestPage() {
   // Auth check
   const cookieStore = await cookies();
