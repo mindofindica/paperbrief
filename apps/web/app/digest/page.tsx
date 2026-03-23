@@ -5,6 +5,7 @@ import { verifySessionCookie } from '../../lib/auth';
 import { getServiceSupabase } from '../../lib/supabase';
 import PaperCard from '../components/PaperCard';
 import AppNav from '../components/AppNav';
+import { DigestEmptyState } from './components/DigestEmptyState';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,12 +21,33 @@ interface DigestEntry {
   } | null;
 }
 
+/**
+ * Return the next expected digest delivery time.
+ * The pipeline runs daily at 08:30 CET (07:30 UTC).
+ *
+ * If current UTC time is before 07:30, next run is today at 07:30 UTC.
+ * Otherwise next run is tomorrow at 07:30 UTC.
+ */
+export function getNextDigestTime(now: Date = new Date()): Date {
+  const RUN_HOUR_UTC = 7;
+  const RUN_MIN_UTC = 30;
+
+  const todayRun = new Date(now);
+  todayRun.setUTCHours(RUN_HOUR_UTC, RUN_MIN_UTC, 0, 0);
+
+  return now < todayRun
+    ? todayRun
+    : new Date(todayRun.getTime() + 24 * 60 * 60 * 1000);
+}
+
 export default async function DigestPage() {
   // Auth check
   const cookieStore = await cookies();
   const session = cookieStore.get('pb_session')?.value;
   const auth = session ? verifySessionCookie(session) : { valid: false };
   if (!auth.valid) redirect('/login');
+
+  const userId = (auth as { valid: true; userId: string }).userId;
 
   const today = new Date().toISOString().slice(0, 10);
   const displayDate = new Date().toLocaleDateString('en-US', {
@@ -34,6 +56,8 @@ export default async function DigestPage() {
   });
 
   const supabase = getServiceSupabase();
+
+  // Fetch digest entries for today
   const { data: entries, error } = await supabase
     .from('paper_digest_entries')
     .select('arxiv_id, track, llm_score, papers(title, abstract, authors, published_at)')
@@ -71,6 +95,19 @@ export default async function DigestPage() {
 
   const recentDates = [...new Set((recentEntries ?? []).map(e => e.date))].slice(0, 5);
 
+  // Check track count (needed for context-aware empty state)
+  let trackCount = 0;
+  if (papers.length === 0 && userId) {
+    const { count } = await supabase
+      .from('tracks')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('active', true);
+    trackCount = count ?? 0;
+  }
+
+  const nextDigestTime = getNextDigestTime();
+
   return (
     <div className="min-h-screen bg-gray-950">
       <AppNav />
@@ -79,11 +116,14 @@ export default async function DigestPage() {
         <header>
           <h1 className="text-2xl font-bold text-gray-100">{displayDate}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {papers.length} paper{papers.length !== 1 ? 's' : ''} across {Object.keys(byTrack).length} track{Object.keys(byTrack).length !== 1 ? 's' : ''}
+            {papers.length === 0
+              ? 'Your personalised daily digest'
+              : `${papers.length} paper${papers.length !== 1 ? 's' : ''} across ${Object.keys(byTrack).length} track${Object.keys(byTrack).length !== 1 ? 's' : ''}`
+            }
           </p>
         </header>
 
-        {/* Date nav strip */}
+        {/* Date nav strip — only shown when there are past digests */}
         {recentDates.length > 0 && (
           <div className="flex gap-2 text-xs overflow-x-auto pb-1">
             <span className="text-gray-400 self-center shrink-0">Recent:</span>
@@ -96,24 +136,26 @@ export default async function DigestPage() {
           </div>
         )}
 
-        {/* Quick links to other features */}
-        <div className="flex gap-3 flex-wrap text-xs">
-          <Link href="/preview" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
-            📬 Preview next digest
-          </Link>
-          <Link href="/gaps" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
-            🔍 Find reading gaps
-          </Link>
-          <Link href="/quiz" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
-            🧠 Take a quiz
-          </Link>
-        </div>
+        {/* Quick links to other features — only when papers are present */}
+        {papers.length > 0 && (
+          <div className="flex gap-3 flex-wrap text-xs">
+            <Link href="/preview" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
+              📬 Preview next digest
+            </Link>
+            <Link href="/gaps" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
+              🔍 Find reading gaps
+            </Link>
+            <Link href="/quiz" className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700 transition-colors">
+              🧠 Take a quiz
+            </Link>
+          </div>
+        )}
 
         {papers.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-400">No digest available yet for today.</p>
-            <p className="text-gray-600 text-sm mt-1">Check back after 08:30 CET — the pipeline runs daily.</p>
-          </div>
+          <DigestEmptyState
+            hasNoTracks={trackCount === 0}
+            nextDigestTime={nextDigestTime}
+          />
         ) : (
           Object.entries(byTrack).map(([track, trackPapers]) => (
             <section key={track} className="space-y-3">
