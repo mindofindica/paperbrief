@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getNextDigestTime } from '../page';
+import { getNextDigestTime } from '../../../lib/digest-utils';
 
 /**
  * The digest pipeline runs daily at 07:30 UTC (= 08:30 CET).

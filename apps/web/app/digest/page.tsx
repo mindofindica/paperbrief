@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getNextDigestTime } from '../../lib/digest-utils';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { verifySessionCookie } from '../../lib/auth';
@@ -28,7 +29,7 @@ interface DigestEntry {
  * If current UTC time is before 07:30, next run is today at 07:30 UTC.
  * Otherwise next run is tomorrow at 07:30 UTC.
  */
-export function getNextDigestTime(now: Date = new Date()): Date {
+function getNextDigestTime(now: Date = new Date()): Date {
   const RUN_HOUR_UTC = 7;
   const RUN_MIN_UTC = 30;
 
