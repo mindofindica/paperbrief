@@ -121,7 +121,7 @@ describe('GET /api/auth/verify', () => {
     expect(res.headers.get('location')).toMatch(/\/onboarding/);
   });
 
-  it('redirects new user with tracks to /digest', async () => {
+  it('redirects new user with tracks to /home', async () => {
     const { verifyMagicToken } = await import('../../../../lib/auth');
     (verifyMagicToken as any).mockResolvedValue({ valid: true, userId: 'user-2' });
 
@@ -135,7 +135,7 @@ describe('GET /api/auth/verify', () => {
     const res = await GET(req);
 
     expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toMatch(/\/digest/);
+    expect(res.headers.get('location')).toMatch(/\/home/);
   });
 
   it('redirects returning user with no tracks to /onboarding (redirect=/digest)', async () => {
@@ -156,7 +156,7 @@ describe('GET /api/auth/verify', () => {
     expect(res.headers.get('location')).toMatch(/\/onboarding/);
   });
 
-  it('redirects returning user with tracks to /digest', async () => {
+  it('redirects returning user with tracks to /home', async () => {
     const { verifyMagicToken } = await import('../../../../lib/auth');
     (verifyMagicToken as any).mockResolvedValue({ valid: true, userId: 'user-4' });
 
@@ -170,7 +170,7 @@ describe('GET /api/auth/verify', () => {
     const res = await GET(req);
 
     expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toMatch(/\/digest/);
+    expect(res.headers.get('location')).toMatch(/\/home/);
   });
 
   it('respects custom ?redirect when user has tracks', async () => {

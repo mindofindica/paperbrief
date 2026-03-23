@@ -11,16 +11,10 @@ interface NavLink {
 }
 
 const NAV_LINKS: NavLink[] = [
-  { href: '/today', label: 'Today', exact: true },
-  { href: '/topics', label: 'Topics', exact: true },
   { href: '/digest', label: 'Digest' },
-  { href: '/daily', label: 'Daily' },
   { href: '/search', label: 'Search', exact: true },
-  { href: '/recommend', label: 'Recommend', exact: true },
   { href: '/reading-list', label: 'Reading List', exact: true },
   { href: '/following', label: 'Following', exact: true },
-  { href: '/collections', label: 'Collections', exact: true },
-  { href: '/stats', label: 'Stats', exact: true },
   { href: '/settings', label: '⚙️', exact: true },
 ];
 
@@ -50,13 +44,13 @@ export default function AppNav({ back }: AppNavProps) {
             <span>{back.label}</span>
           </Link>
         ) : (
-          <Link href="/digest" className="text-lg font-bold text-gray-100 hover:text-white transition-colors">
+          <Link href="/home" className="text-lg font-bold text-gray-100 hover:text-white transition-colors">
             📄 PaperBrief
           </Link>
         )}
 
         {/* Right: main links */}
-        <div className="flex gap-4 text-sm">
+        <div className="hidden sm:flex gap-4 text-sm">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}

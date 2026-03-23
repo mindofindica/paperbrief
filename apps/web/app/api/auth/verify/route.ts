@@ -51,7 +51,7 @@ async function recordFirstLogin(userId: string): Promise<boolean> {
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');
-  const redirect = request.nextUrl.searchParams.get('redirect') || '/digest';
+  const redirect = request.nextUrl.searchParams.get('redirect') || '/home';
 
   if (!token) {
     return NextResponse.json({ error: 'Missing token' }, { status: 400 });
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
   // Determine redirect destination
   let destination = redirect;
-  if (isFirstLogin || redirect === '/digest') {
+  if (isFirstLogin || redirect === '/digest' || redirect === '/home') {
     // For first-time users: check if they have any tracks configured
     // If not, send them to onboarding to pick their research interests
     try {
