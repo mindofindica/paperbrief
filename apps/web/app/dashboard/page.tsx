@@ -7,6 +7,8 @@ import type { Track } from "./types";
 import TrackManager from "./components/TrackManager";
 import DigestPreview from "./components/DigestPreview";
 import UpgradeCTA from "./components/UpgradeCTA";
+import AppNav from "../components/AppNav";
+import BottomNav from "../components/BottomNav";
 
 export default async function DashboardPage({
   searchParams,
@@ -45,13 +47,15 @@ export default async function DashboardPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 px-6 py-12">
-      <div className="max-w-3xl mx-auto space-y-8">
-        <header className="space-y-2">
-          <p className="text-sm uppercase tracking-widest text-gray-500">Dashboard</p>
-          <h1 className="text-3xl font-bold">My Research Tracks</h1>
-          <p className="text-gray-400">Tune what PaperBrief watches for you.</p>
-        </header>
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      <AppNav back={{ href: "/home", label: "Home" }} />
+      <main className="px-6 py-12 pb-20 sm:pb-12">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <header className="space-y-2">
+            <p className="text-sm uppercase tracking-widest text-gray-500">Dashboard</p>
+            <h1 className="text-3xl font-bold">My Research Tracks</h1>
+            <p className="text-gray-400">Tune what PaperBrief watches for you.</p>
+          </header>
 
         {/* Stripe redirect banners */}
         {upgradeStatus === "success" && (
@@ -78,7 +82,9 @@ export default async function DashboardPage({
         <hr className="border-gray-800" />
 
         <DigestPreview />
-      </div>
+        </div>
+      </main>
+      <BottomNav />
     </div>
   );
 }
