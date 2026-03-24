@@ -6,6 +6,7 @@ import FollowAuthorButton from '../../components/FollowAuthorButton';
 import type { Paper } from '../../../lib/arxiv-db';
 import AddToCollectionButton from '../../components/AddToCollectionButton';
 import { authorNameToSlug } from '../../../lib/author-pages';
+import SimilarPapersSection from './SimilarPapersSection';
 
 const TRACK_COLORS: Record<string, string> = {
   'cs.AI': 'bg-blue-900/60 text-blue-200',
@@ -573,6 +574,9 @@ export default function PaperDetailClient({ paper }: { paper: Paper }) {
             publishedAt={paper.published_at}
           />
         </section>
+
+        {/* ── Similar Papers ── */}
+        <SimilarPapersSection arxivId={paper.arxiv_id} />
       </main>
     </div>
   );
