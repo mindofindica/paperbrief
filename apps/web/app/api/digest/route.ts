@@ -223,14 +223,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
 
         // Record each sent paper for dedup (using track column to store userId)
-        await supabase.from('paper_digest_entries').insert(
-          digestEntries.map((e) => ({
-            date: today,
-            arxiv_id: e.arxivId,
-            track: userId,
-            llm_score: e.score,
-          }))
-        );
+        const { error: digestInsertError } = await supabase
+          .from('paper_digest_entries')
+          .insert(
+            digestEntries.map((e) => ({
+              date: today,
+              arxiv_id: e.arxivId,
+              track: userId,
+              llm_score: e.score,
+            }))
+          );
+        if (digestInsertError) {
+          console.error('[digest] Failed to insert paper_digest_entries:', digestInsertError);
+        }
 
         totalDeliveries++;
       } catch (userErr) {
