@@ -83,7 +83,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 name="from"
                 type="date"
                 defaultValue={from ?? ''}
-                className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-gray-100 focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[42px] appearance-none rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-gray-100 focus:border-blue-600 focus:outline-none"
               />
             </div>
             <div>
