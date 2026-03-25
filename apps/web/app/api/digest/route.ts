@@ -31,9 +31,12 @@ const MIN_LLM_SCORE = 3; // papers below this are filtered out
 const MAX_FOLLOWED_PAPERS = 3;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // Verify cron secret
+  // Verify cron secret (or Vercel cron header)
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronHeader = req.headers.get('x-vercel-cron');
+  const scheduledHeader = req.headers.get('x-vercel-scheduled');
+  const isCron = cronHeader === '1' || cronHeader === 'true' || scheduledHeader === '1' || scheduledHeader === 'true';
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !isCron) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -250,9 +253,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
 // Also support GET for Vercel Cron (which sends GET requests)
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  // Vercel cron sends Authorization header
+  // Vercel cron sends a header; allow either auth or cron header
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronHeader = req.headers.get('x-vercel-cron');
+  const scheduledHeader = req.headers.get('x-vercel-scheduled');
+  const isCron = cronHeader === '1' || cronHeader === 'true' || scheduledHeader === '1' || scheduledHeader === 'true';
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !isCron) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return POST(new NextRequest(req.url, {
