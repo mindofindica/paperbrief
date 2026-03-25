@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const items = searchPapers({
+    const items = await searchPapers({
       query,
       track,
       fromDate: from,

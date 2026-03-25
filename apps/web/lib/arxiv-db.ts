@@ -116,67 +116,65 @@ export function getTodaysPapers(): Paper[] {
   return rows.map(rowToPaper);
 }
 
-export function searchPapers(options: SearchPapersOptions): Paper[] {
-  const db = requireDb();
+export async function searchPapers(options: SearchPapersOptions): Promise<Paper[]> {
   const trimmedQuery = options.query.trim();
   if (!trimmedQuery) return [];
 
   const limit = Math.min(Math.max(1, options.limit ?? 5), 20);
-  const ftsQuery = buildFtsQuery(trimmedQuery);
 
-  let sql = `
-    SELECT
-      p.arxiv_id,
-      p.title,
-      p.abstract,
-      p.published_at,
-      p.authors_json,
-      ls.relevance_score,
-      (SELECT track_name FROM track_matches WHERE arxiv_id = p.arxiv_id ORDER BY score DESC LIMIT 1) AS track
-    FROM papers_fts fts
-    JOIN papers p ON p.arxiv_id = fts.arxiv_id
-    LEFT JOIN llm_scores ls ON ls.arxiv_id = p.arxiv_id
-    LEFT JOIN track_matches tm ON tm.arxiv_id = p.arxiv_id
-    WHERE papers_fts MATCH ?
-  `;
-
-  const params: Array<string | number> = [ftsQuery];
-
-  if (options.track) {
-    sql += ` AND tm.track_name LIKE ?`;
-    params.push(`%${options.track}%`);
-  }
-
-  if (options.fromDate) {
-    sql += ` AND DATE(p.published_at) >= DATE(?)`;
-    params.push(options.fromDate);
-  }
-
-  sql += `
-    GROUP BY p.arxiv_id
-    ORDER BY
-      ls.relevance_score DESC,
-      COALESCE(MAX(tm.score), 0) DESC,
-      rank
-    LIMIT ?
-  `;
-  params.push(limit);
-
-  let rows: SearchRow[] = [];
   try {
-    rows = db.prepare(sql).all(...params) as SearchRow[];
-  } catch {
-    const fallbackQuery = trimmedQuery.replace(/[^a-zA-Z0-9 ]/g, ' ').trim();
-    if (!fallbackQuery) return [];
+    const supabase = getServiceSupabase();
 
-    try {
-      rows = db.prepare(sql).all(fallbackQuery, ...params.slice(1)) as SearchRow[];
-    } catch {
-      return [];
+    let query = supabase
+      .from('papers')
+      .select('arxiv_id,title,abstract,published_at,authors')
+      .or(`title.ilike.%${trimmedQuery}%,abstract.ilike.%${trimmedQuery}%`)
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    if (options.fromDate) {
+      query = query.gte('published_at', options.fromDate);
     }
-  }
 
-  return rows.map(rowToPaper);
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    const ids = data.map((row) => row.arxiv_id);
+    const digestMap = new Map<string, { track: string | null; llm_score: number | null }>();
+
+    if (ids.length > 0) {
+      const { data: digestRows } = await supabase
+        .from('paper_digest_entries')
+        .select('arxiv_id,track,llm_score')
+        .in('arxiv_id', ids)
+        .order('llm_score', { ascending: false });
+
+      (digestRows ?? []).forEach((row) => {
+        if (!digestMap.has(row.arxiv_id)) {
+          digestMap.set(row.arxiv_id, {
+            track: row.track ?? null,
+            llm_score: row.llm_score ?? null,
+          });
+        }
+      });
+    }
+
+    return data.map((row) => {
+      const digest = digestMap.get(row.arxiv_id);
+      return {
+        arxiv_id: row.arxiv_id,
+        title: row.title,
+        abstract: row.abstract ?? null,
+        published_at: row.published_at ?? null,
+        llm_score: digest?.llm_score ?? null,
+        track: digest?.track ?? null,
+        authors: Array.isArray(row.authors) ? JSON.stringify(row.authors) : (row.authors ?? null),
+        url: `https://arxiv.org/abs/${row.arxiv_id}`,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 export async function getPaper(arxivId: string): Promise<Paper | undefined> {

@@ -32,7 +32,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const limit = parseLimit(params.limit);
 
   const papers = query
-    ? searchPapers({
+    ? await searchPapers({
         query,
         track: track || null,
         fromDate: from,
