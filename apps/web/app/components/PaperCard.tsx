@@ -136,7 +136,7 @@ export default function PaperCard({ paper, noteCount = 0 }: { paper: Paper; note
       <p className="text-sm text-gray-400 leading-relaxed">{abstractSnippet}</p>
 
       {/* Explanation levels */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {EXPLANATION_LEVELS.map(({ key, label }) => (
           <button
             key={key}
@@ -160,7 +160,7 @@ export default function PaperCard({ paper, noteCount = 0 }: { paper: Paper; note
       )}
 
       {/* Feedback buttons */}
-      <div className="flex gap-1 pt-1">
+      <div className="flex flex-wrap gap-1 pt-2">
         {FEEDBACK_ACTIONS.map(({ action, icon, label }) => (
           <button
             key={action}
