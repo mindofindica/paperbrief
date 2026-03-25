@@ -23,6 +23,8 @@ import {
   type ScoredEntry,
 } from '../../../lib/digest-personalization';
 
+export const runtime = 'nodejs';
+
 const DEDUP_DAYS = 21;
 const MAX_PAPERS_PER_DIGEST = 10;
 const MIN_LLM_SCORE = 3; // papers below this are filtered out
