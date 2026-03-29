@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { GET, PATCH } from './route';
-import { resolveFrequency, FREE_FREQUENCIES, PRO_FREQUENCIES, type DigestFrequencyOverride } from '../../../lib/digest-settings';
+import { GET, PATCH, resolveFrequency, type DigestFrequencyOverride } from './route';
 import { getServiceSupabase } from '../../../lib/supabase';
 import { verifySessionCookie } from '../../../lib/auth';
 
