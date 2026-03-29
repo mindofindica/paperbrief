@@ -5,9 +5,14 @@ import { getServiceSupabase } from '../../../lib/supabase';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://paperbrief.ai';
 
+/**
+ * Look up a user's UUID by email via a direct SQL call.
+ * Avoids auth.admin.listUsers() which is unreliable on free-tier Supabase.
+ */
 async function getUserIdByEmail(email: string): Promise<string | null> {
   const supabase = getServiceSupabase();
-  const { data, error } = await supabase.rpc('get_user_id_by_email', { p_email: email });
+  const { data, error } = await supabase
+    .rpc('get_user_id_by_email', { p_email: email });
   if (error || !data) return null;
   return data as string;
 }
@@ -21,6 +26,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const supabase = getServiceSupabase();
 
+    // Resolve the user's real UUID — create account if first login
     let userId = await getUserIdByEmail(email);
     if (!userId) {
       const { data: created, error: createError } = await supabase.auth.admin.createUser({
