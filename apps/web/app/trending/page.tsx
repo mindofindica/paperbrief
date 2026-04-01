@@ -104,7 +104,8 @@ export default async function TrendingPage() {
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <a href="/" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
           <div className="flex gap-4 text-sm items-center">
-            <a href="/trending" className="text-gray-100 font-medium">Trending</a>
+            <a href="/trending" className="text-gray-100 font-medium">This week</a>
+            <a href="/trending/today" className="text-gray-500 hover:text-gray-300 transition-colors">Today</a>
             <a href="/auth/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</a>
             <a
               href="/"
@@ -117,6 +118,22 @@ export default async function TrendingPage() {
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-8">
+        {/* ── Today's picks teaser ── */}
+        <a
+          href="/trending/today"
+          className="flex items-center justify-between gap-4 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-3 mb-6 transition-colors group"
+        >
+          <div>
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-200">
+              <span>⚡</span> Top 5 papers today
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Highest-scoring arXiv ML papers from the last 24 hours
+            </p>
+          </div>
+          <span className="text-gray-600 group-hover:text-gray-400 transition-colors">→</span>
+        </a>
+
         {/* ── Header ── */}
         <header className="mb-8">
           <div className="flex items-center gap-2 mb-1">
