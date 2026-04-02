@@ -49,7 +49,7 @@ function makeChain(resolveWith: unknown): ChainMock {
     chain[m] = vi.fn().mockReturnValue(chain);
   }
   // Make it awaitable — cast to any to avoid generic-variance noise
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   (chain as any)['then'] = (onfulfilled: any, onrejected: any) =>
     Promise.resolve(resolveWith).then(onfulfilled, onrejected);
   return chain;
