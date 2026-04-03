@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
+import Link from "next/link";
 import { loginWithPassword } from "./actions";
 
 type AuthMode = "magic" | "password";
@@ -137,12 +138,12 @@ export default function LoginPage() {
           )}
         </div>
 
-        <a
+        <Link
           href="/"
           className="block text-center text-gray-500 hover:text-gray-300 text-sm transition-colors"
         >
           ← Back to home
-        </a>
+        </Link>
       </div>
     </div>
   );

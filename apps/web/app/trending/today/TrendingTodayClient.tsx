@@ -12,6 +12,7 @@
  */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { TodayPaper } from './page';
 
 // ── Score bar ─────────────────────────────────────────────────────────────────
@@ -243,12 +244,12 @@ export default function TrendingTodayClient({
           <p className="text-gray-600 text-sm mt-2">
             Check back later — digests run through the morning.
           </p>
-          <a
+          <Link
             href="/trending"
             className="inline-block mt-6 text-blue-400 hover:text-blue-300 text-sm transition-colors"
           >
             ← See this week's trending papers
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
@@ -268,23 +269,23 @@ export default function TrendingTodayClient({
             PaperBrief sends you a personalised daily digest of the arXiv papers
             that actually matter for your research track.
           </p>
-          <a
+          <Link
             href="/"
             className="inline-block bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors"
           >
             Get your personalised digest →
-          </a>
+          </Link>
         </div>
       )}
 
       {/* ── Nav to /trending ── */}
       <div className="mt-6 text-center">
-        <a
+        <Link
           href="/trending"
           className="text-sm text-gray-600 hover:text-gray-400 transition-colors"
         >
           ← See all trending papers this week
-        </a>
+        </Link>
       </div>
     </>
   );

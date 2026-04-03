@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 
 interface Collection {
   id: string;
@@ -141,12 +142,12 @@ export default function AddToCollectionButton({
           ) : collections.length === 0 ? (
             <div className="px-4 py-4 text-center space-y-2">
               <p className="text-gray-400 text-sm">No collections yet.</p>
-              <a
+              <Link
                 href="/collections"
                 className="inline-block text-xs text-violet-400 hover:text-violet-300 transition-colors"
               >
                 Create your first collection →
-              </a>
+              </Link>
             </div>
           ) : (
             <>
@@ -176,12 +177,12 @@ export default function AddToCollectionButton({
                 })}
               </div>
               <div className="border-t border-gray-800 px-4 py-2">
-                <a
+                <Link
                   href="/collections"
                   className="text-xs text-gray-500 hover:text-violet-400 transition-colors"
                 >
                   Manage collections →
-                </a>
+                </Link>
               </div>
             </>
           )}
