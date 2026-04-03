@@ -5,6 +5,7 @@
  * Serves as a human-readable landing page; the actual XML feed is at GET /rss.
  */
 
+import Link from 'next/link';
 import { getAvailableTracks } from '../../lib/arxiv-db';
 import { getAllTopics } from '../../lib/topics';
 
@@ -79,28 +80,28 @@ export default function RssIndexPage() {
       {/* Nav */}
       <nav className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <a href="/digest" className="text-lg font-bold text-gray-100">
+          <Link href="/digest" className="text-lg font-bold text-gray-100">
             📄 PaperBrief
-          </a>
+          </Link>
           <div className="flex gap-4 text-sm">
-            <a
+            <Link
               href="/digest"
               className="text-gray-500 hover:text-gray-300 transition-colors"
             >
               Digest
-            </a>
-            <a
+            </Link>
+            <Link
               href="/search"
               className="text-gray-500 hover:text-gray-300 transition-colors"
             >
               Search
-            </a>
-            <a
+            </Link>
+            <Link
               href="/reading-list"
               className="text-gray-500 hover:text-gray-300 transition-colors"
             >
               Reading List
-            </a>
+            </Link>
           </div>
         </div>
       </nav>

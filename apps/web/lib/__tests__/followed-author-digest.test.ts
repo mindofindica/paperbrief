@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AuthorPaper } from '../author-follows';
 import type { DigestEntry } from '@paperbrief/core';
+import { scoreLabel } from '@paperbrief/core';
 
 // ── Shared mock data ──────────────────────────────────────────────────────────
 
@@ -457,24 +458,20 @@ describe('digest route — followed author papers integration', () => {
   });
 
   it('scoreLabel: score >= 5 is Essential', () => {
-    const { scoreLabel } = require('@paperbrief/core');
     expect(scoreLabel(5)).toBe('🔥 Essential');
     expect(scoreLabel(6)).toBe('🔥 Essential');
   });
 
   it('scoreLabel: score >= 4 is Relevant', () => {
-    const { scoreLabel } = require('@paperbrief/core');
     expect(scoreLabel(4)).toBe('⭐ Relevant');
     expect(scoreLabel(4.9)).toBe('⭐ Relevant');
   });
 
   it('scoreLabel: score >= 3 is Worth a look', () => {
-    const { scoreLabel } = require('@paperbrief/core');
     expect(scoreLabel(3)).toBe('📌 Worth a look');
   });
 
   it('scoreLabel: score < 3 is Marginal', () => {
-    const { scoreLabel } = require('@paperbrief/core');
     expect(scoreLabel(2)).toBe('· Marginal');
     expect(scoreLabel(1)).toBe('· Marginal');
   });

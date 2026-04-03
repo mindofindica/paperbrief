@@ -7,6 +7,7 @@
  */
 
 import { Metadata } from 'next';
+import Link from 'next/link';
 import AppNav from '../components/AppNav';
 import { getPaperOfTheDay, generateShareText, getScoreBadge, formatAuthors } from '../../lib/today';
 
@@ -200,15 +201,15 @@ export default async function TodayPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-gray-800 mt-16 px-6 py-8 text-center text-xs text-gray-600">
         <p>
-          <a href="/" className="hover:text-gray-400 transition-colors">PaperBrief</a>
+          <Link href="/" className="hover:text-gray-400 transition-colors">PaperBrief</Link>
           {' · '}
-          <a href="/today" className="hover:text-gray-400 transition-colors">Today</a>
+          <Link href="/today" className="hover:text-gray-400 transition-colors">Today</Link>
           {' · '}
-          <a href="/trending" className="hover:text-gray-400 transition-colors">Trending</a>
+          <Link href="/trending" className="hover:text-gray-400 transition-colors">Trending</Link>
           {' · '}
-          <a href="/rss" className="hover:text-gray-400 transition-colors">RSS</a>
+          <Link href="/rss" className="hover:text-gray-400 transition-colors">RSS</Link>
           {' · '}
-          <a href="/rss/daily" className="hover:text-gray-400 transition-colors">Daily RSS</a>
+          <Link href="/rss/daily" className="hover:text-gray-400 transition-colors">Daily RSS</Link>
           {' · '}
           Papers from{' '}
           <a href="https://arxiv.org" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">arXiv</a>

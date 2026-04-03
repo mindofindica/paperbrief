@@ -237,7 +237,7 @@ export function computeCategoryBonus(
  * object. Used before passing to sendDigestEmail.
  */
 export function toDigestEntry(entry: ScoredEntry): Omit<ScoredEntry, "categories"> {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const { categories: _cats, ...rest } = entry;
   return rest;
 }
