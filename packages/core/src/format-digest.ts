@@ -5,8 +5,8 @@
  * Outputs structured Digest objects for email/Telegram/Slack rendering.
  */
 
-import type { Digest, DigestEntry, ScoredPaper } from './types.js';
-import { formatAuthors, scoreLabel } from './types.js';
+import type { Digest, DigestEntry, ScoredPaper } from './types';
+import { formatAuthors, scoreLabel } from './types';
 
 export interface DigestOptions {
   userId: string;

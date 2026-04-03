@@ -8,7 +8,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import type { ArxivPaper } from './types.js';
+import type { ArxivPaper } from './types';
 
 const parser = new XMLParser({
   ignoreAttributes: false,

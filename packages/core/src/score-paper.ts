@@ -7,7 +7,7 @@
  * Uses OpenRouter for model access (supports Claude, GPT-4o, etc.).
  */
 
-import type { ArxivPaper, ScoredPaper, Track } from './types.js';
+import type { ArxivPaper, ScoredPaper, Track } from './types';
 
 export interface LLMConfig {
   apiKey: string;
