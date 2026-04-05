@@ -48,26 +48,36 @@ function mockSupabase<T>(result: SupaResult<T>) {
 
 // ── Sample data ───────────────────────────────────────────────────────────────
 
+// Matches the paper_digest_entries+papers join shape used by getDailyPaperHistory
 function makeRow(overrides: Partial<{
   arxiv_id: string;
   title: string;
   authors: string[];
   abstract: string;
   categories: string[];
-  submitted_date: string;
+  submitted_date: string; // maps to entry.date (digest date) and papers.published_at
   llm_score: number | string;
-  keyword_score: number | string;
 }> = {}) {
+  const {
+    arxiv_id = '2401.00001',
+    title = 'Attention Is All You Need: Redux',
+    authors = ['Alice Smith', 'Bob Jones'],
+    abstract = 'We propose a new transformer architecture that is better.',
+    categories = ['cs.LG', 'cs.AI'],
+    submitted_date = '2026-03-15',
+    llm_score = 9.2,
+  } = overrides;
   return {
-    arxiv_id: '2401.00001',
-    title: 'Attention Is All You Need: Redux',
-    authors: ['Alice Smith', 'Bob Jones'],
-    abstract: 'We propose a new transformer architecture that is better.',
-    categories: ['cs.LG', 'cs.AI'],
-    submitted_date: '2026-03-15',
-    llm_score: 9.2,
-    keyword_score: 7.5,
-    ...overrides,
+    llm_score,
+    date: submitted_date,
+    papers: {
+      arxiv_id,
+      title,
+      authors,
+      abstract,
+      categories,
+      published_at: submitted_date,
+    },
   };
 }
 
@@ -113,7 +123,7 @@ describe('getDailyPaperHistory()', () => {
     expect(paper.arxivId).toBe('2401.00001');
     expect(paper.title).toBe('Attention Is All You Need: Redux');
     expect(paper.llmScore).toBe(9.2);
-    expect(paper.keywordScore).toBe(7.5);
+    expect(paper.keywordScore).toBe(0); // not stored in current schema
     expect(paper.authors).toEqual(['Alice Smith', 'Bob Jones']);
     expect(paper.categories).toEqual(['cs.LG', 'cs.AI']);
   });
