@@ -12,6 +12,7 @@
 
 import { Metadata } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import Link from 'next/link';
 import TrendingClient from './TrendingClient';
 import type { TrendingPaper, TrendingResponse } from '../api/trending/route';
 
@@ -102,24 +103,24 @@ export default async function TrendingPage() {
       {/* ── Nav ── */}
       <nav className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <a href="/" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
+          <Link href="/" className="text-lg font-bold text-gray-100">📄 PaperBrief</Link>
           <div className="flex gap-4 text-sm items-center">
-            <a href="/trending" className="text-gray-100 font-medium">This week</a>
-            <a href="/trending/today" className="text-gray-500 hover:text-gray-300 transition-colors">Today</a>
-            <a href="/auth/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</a>
-            <a
+            <Link href="/trending" className="text-gray-100 font-medium">This week</Link>
+            <Link href="/trending/today" className="text-gray-500 hover:text-gray-300 transition-colors">Today</Link>
+            <Link href="/auth/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</Link>
+            <Link
               href="/"
               className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
             >
               Get digest →
-            </a>
+            </Link>
           </div>
         </div>
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-8">
         {/* ── Today's picks teaser ── */}
-        <a
+        <Link
           href="/trending/today"
           className="flex items-center justify-between gap-4 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 rounded-xl px-5 py-3 mb-6 transition-colors group"
         >
@@ -132,7 +133,7 @@ export default async function TrendingPage() {
             </p>
           </div>
           <span className="text-gray-600 group-hover:text-gray-400 transition-colors">→</span>
-        </a>
+        </Link>
 
         {/* ── Header ── */}
         <header className="mb-8">
@@ -157,11 +158,11 @@ export default async function TrendingPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-gray-800 mt-16 px-6 py-8 text-center text-xs text-gray-600">
         <p>
-          <a href="/" className="hover:text-gray-400 transition-colors">PaperBrief</a>
+          <Link href="/" className="hover:text-gray-400 transition-colors">PaperBrief</Link>
           {' · '}
-          <a href="/trending" className="hover:text-gray-400 transition-colors">Trending</a>
+          <Link href="/trending" className="hover:text-gray-400 transition-colors">Trending</Link>
           {' · '}
-          <a href="/rss" className="hover:text-gray-400 transition-colors">RSS</a>
+          <Link href="/rss" className="hover:text-gray-400 transition-colors">RSS</Link>
           {' · '}
           Aggregated from user digests · Updated every 6 hours · Papers from{' '}
           <a href="https://arxiv.org" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">arXiv</a>

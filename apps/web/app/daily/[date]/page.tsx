@@ -166,12 +166,12 @@ function SignupCTA() {
         PaperBrief ranks 500+ arXiv papers every day and delivers the ones that matter to you —
         free.
       </p>
-      <a
+      <Link
         href="/"
         className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors"
       >
         Start free at paperbrief.ai →
-      </a>
+      </Link>
     </div>
   );
 }

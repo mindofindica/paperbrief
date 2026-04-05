@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { TrendingPaper } from '../api/trending/route';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -248,12 +249,12 @@ export default function TrendingClient({
           <p className="text-gray-500 text-sm mb-4">
             Want papers like these tailored to your research interests?
           </p>
-          <a
+          <Link
             href="/"
             className="inline-block bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
           >
             Get your personalised digest →
-          </a>
+          </Link>
         </div>
       )}
     </div>

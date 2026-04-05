@@ -30,7 +30,7 @@ import { Resend } from "resend";
 
 // Helper to grab the mock send function from the mocked Resend instance
 function getMockSend() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   return (Resend as any).__mockSend ?? (Resend as any).mock?.results?.[0]?.value?.emails?.send;
 }
 
@@ -41,7 +41,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   // Re-import to get fresh mock reference after clearAllMocks
   const resendModule = await import("resend");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   mockSend = (resendModule as any).__mockSend;
 });
 

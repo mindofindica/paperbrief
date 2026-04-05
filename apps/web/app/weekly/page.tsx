@@ -1,4 +1,5 @@
 import { getWeeklyPapers, getWeeklyStats, getWeeklyKeywordTrends } from '../../lib/arxiv-db';
+import Link from 'next/link';
 import AppNav from '../components/AppNav';
 import PaperCard from '../components/PaperCard';
 
@@ -154,7 +155,7 @@ export default function WeeklyPage() {
         {/* Footer */}
         <footer className="pt-4 border-t border-gray-800">
           <div className="flex items-center justify-between text-xs text-gray-600">
-            <a href="/digest" className="hover:text-gray-400 transition-colors">← Back to today&apos;s digest</a>
+            <Link href="/digest" className="hover:text-gray-400 transition-colors">← Back to today&apos;s digest</Link>
             <span>Updated daily by arxiv-coach</span>
           </div>
         </footer>

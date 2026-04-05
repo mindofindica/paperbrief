@@ -8,7 +8,7 @@
  * Papers link to /paper/[arxivId] for full detail.
  */
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import AppNav from '../../components/AppNav';
 
 interface CollectionPaper {
@@ -59,11 +59,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   // Remove state
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [id]);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +76,11 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();

@@ -4,6 +4,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 import WaitlistForm from "./components/WaitlistForm";
 import SampleDigest from "./components/SampleDigest";
 import { getPaperOfTheDay, formatAuthors, getScoreBadge } from "../lib/today";
@@ -43,11 +44,11 @@ export default async function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <span className="font-bold text-xl text-gray-900">📄 PaperBrief</span>
         <div className="flex items-center gap-4">
-          <a href="/today" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline font-medium">Today</a>
-          <a href="/trending" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Trending</a>
-          <a href="/topics" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Topics</a>
-          <a href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</a>
-          <a href="/auth/login" className="text-sm font-medium text-gray-900 hover:text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:border-gray-400 transition-colors">Sign in</a>
+          <Link href="/today" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline font-medium">Today</Link>
+          <Link href="/trending" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Trending</Link>
+          <Link href="/topics" className="text-sm text-gray-600 hover:text-gray-900 hidden md:inline">Topics</Link>
+          <Link href="/pricing" className="text-sm text-gray-600 hover:text-gray-900">Pricing</Link>
+          <Link href="/auth/login" className="text-sm font-medium text-gray-900 hover:text-gray-600 border border-gray-300 rounded-md px-3 py-1.5 hover:border-gray-400 transition-colors">Sign in</Link>
           <div className="hidden md:block w-[280px]">
             <WaitlistForm compact buttonText="Join waitlist" />
           </div>

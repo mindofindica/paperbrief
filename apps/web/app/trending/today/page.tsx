@@ -11,6 +11,7 @@
 
 import { Metadata } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import Link from 'next/link';
 import TrendingTodayClient from './TrendingTodayClient';
 
 // ── ISR ───────────────────────────────────────────────────────────────────────
@@ -163,17 +164,17 @@ export default async function TrendingTodayPage() {
       {/* ── Nav ── */}
       <nav className="border-b border-gray-800 px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <a href="/" className="text-lg font-bold text-gray-100">📄 PaperBrief</a>
+          <Link href="/" className="text-lg font-bold text-gray-100">📄 PaperBrief</Link>
           <div className="flex gap-4 text-sm items-center">
-            <a href="/trending" className="text-gray-500 hover:text-gray-300 transition-colors">This week</a>
-            <a href="/trending/today" className="text-gray-100 font-medium">Today</a>
-            <a href="/auth/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</a>
-            <a
+            <Link href="/trending" className="text-gray-500 hover:text-gray-300 transition-colors">This week</Link>
+            <Link href="/trending/today" className="text-gray-100 font-medium">Today</Link>
+            <Link href="/auth/login" className="text-gray-500 hover:text-gray-300 transition-colors">Sign in</Link>
+            <Link
               href="/"
               className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
             >
               Get digest →
-            </a>
+            </Link>
           </div>
         </div>
       </nav>
@@ -185,15 +186,15 @@ export default async function TrendingTodayPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-gray-800 mt-16 px-6 py-8 text-center text-xs text-gray-600">
         <p>
-          <a href="/" className="hover:text-gray-400 transition-colors">PaperBrief</a>
+          <Link href="/" className="hover:text-gray-400 transition-colors">PaperBrief</Link>
           {' · '}
-          <a href="/trending" className="hover:text-gray-400 transition-colors">Trending This Week</a>
+          <Link href="/trending" className="hover:text-gray-400 transition-colors">Trending This Week</Link>
           {' · '}
-          <a href="/trending/today" className="hover:text-gray-400 transition-colors">Today</a>
+          <Link href="/trending/today" className="hover:text-gray-400 transition-colors">Today</Link>
           {' · '}
-          <a href="/today" className="hover:text-gray-400 transition-colors">Paper of the Day</a>
+          <Link href="/today" className="hover:text-gray-400 transition-colors">Paper of the Day</Link>
           {' · '}
-          <a href="/rss" className="hover:text-gray-400 transition-colors">RSS</a>
+          <Link href="/rss" className="hover:text-gray-400 transition-colors">RSS</Link>
         </p>
       </footer>
     </div>
