@@ -57,7 +57,9 @@ export async function getPaperOfTheDay(): Promise<PaperOfTheDay | null> {
 
   if (!data || data.length === 0) return null;
 
-  const entry = data[0] as {
+  // Supabase types the joined relation as an array, but with !inner and limit(1)
+  // it is always a single object at runtime. Cast through unknown to satisfy TS.
+  type EntryRow = {
     llm_score: number;
     date: string;
     papers: {
@@ -69,6 +71,7 @@ export async function getPaperOfTheDay(): Promise<PaperOfTheDay | null> {
       published_at: string | null;
     };
   };
+  const entry = data[0] as unknown as EntryRow;
 
   const p = entry.papers;
 
@@ -137,7 +140,8 @@ export async function getDailyPaperHistory(days: number = 30): Promise<DailyPape
   const seen = new Set<string>();
   const entries: DailyPaperEntry[] = [];
 
-  for (const row of data as {
+  // Supabase types the joined relation as array; cast through unknown.
+  type HistoryEntryRow = {
     llm_score: number | string;
     date: string;
     papers: {
@@ -148,7 +152,9 @@ export async function getDailyPaperHistory(days: number = 30): Promise<DailyPape
       categories: string[] | null;
       published_at: string | null;
     };
-  }[]) {
+  };
+
+  for (const row of data as unknown as HistoryEntryRow[]) {
     if (seen.has(row.date)) continue;
     seen.add(row.date);
 

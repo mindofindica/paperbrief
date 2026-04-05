@@ -120,11 +120,12 @@ async function fetchTodaysPapers(): Promise<{ papers: TodayPaper[]; generatedAt:
         .order('llm_score', { ascending: false })
         .limit(5);
 
+      // Supabase types the join as array; cast through unknown to satisfy TS.
       type DigestEntryRow = {
         llm_score: number;
         papers: { arxiv_id: string; title: string; abstract: string | null; authors: string[]; categories: string[]; published_at: string | null; };
       };
-      const papers: TodayPaper[] = ((fallback2 ?? []) as DigestEntryRow[]).map((row) => ({
+      const papers: TodayPaper[] = ((fallback2 ?? []) as unknown as DigestEntryRow[]).map((row) => ({
         arxiv_id: row.papers.arxiv_id,
         title: row.papers.title,
         abstract: row.papers.abstract ?? null,
@@ -138,11 +139,12 @@ async function fetchTodaysPapers(): Promise<{ papers: TodayPaper[]; generatedAt:
       return { papers, generatedAt: new Date().toISOString() };
     }
 
+    // Supabase types the join as array; cast through unknown to satisfy TS.
     type DigestEntryRow = {
       llm_score: number;
       papers: { arxiv_id: string; title: string; abstract: string | null; authors: string[]; categories: string[]; published_at: string | null; };
     };
-    const papers: TodayPaper[] = (fallbackData as DigestEntryRow[]).map((row) => ({
+    const papers: TodayPaper[] = (fallbackData as unknown as DigestEntryRow[]).map((row) => ({
       arxiv_id: row.papers.arxiv_id,
       title: row.papers.title,
       abstract: row.papers.abstract ?? null,
