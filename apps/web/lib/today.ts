@@ -2,7 +2,13 @@
  * today.ts
  *
  * Data layer for "Paper of the Day" feature.
- * Queries the `papers` table for the top-scoring paper from the last 3 days.
+ * Queries paper_digest_entries (which has llm_score) joined with papers
+ * to find the top-scoring paper from the last 3 days.
+ *
+ * Schema notes:
+ *   - papers: arxiv_id, title, abstract, authors, categories, published_at, fetched_at
+ *   - paper_digest_entries: arxiv_id, date, track, llm_score
+ *   - llm_score lives on paper_digest_entries, NOT on papers
  *
  * Server-only — uses service role key.
  */
@@ -27,13 +33,21 @@ export interface PaperOfTheDay {
 export async function getPaperOfTheDay(): Promise<PaperOfTheDay | null> {
   const supabase = getServiceSupabase();
 
+  // Query paper_digest_entries for recent scored papers, joined with papers.
+  // paper_digest_entries.date is the digest date (YYYY-MM-DD);
+  // we look back 3 days to handle weekends / pipeline delays.
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
   const { data, error } = await supabase
-    .from('papers')
-    .select('arxiv_id, title, authors, abstract, categories, submitted_date, llm_score, keyword_score')
-    .gte('submitted_date', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+    .from('paper_digest_entries')
+    .select(
+      'llm_score, date, papers!inner(arxiv_id, title, authors, abstract, categories, published_at)',
+    )
+    .gte('date', threeDaysAgo)
     .not('llm_score', 'is', null)
     .order('llm_score', { ascending: false })
-    .order('keyword_score', { ascending: false })
     .limit(1);
 
   if (error) {
@@ -43,26 +57,33 @@ export async function getPaperOfTheDay(): Promise<PaperOfTheDay | null> {
 
   if (!data || data.length === 0) return null;
 
-  const row = data[0] as {
-    arxiv_id: string;
-    title: string;
-    authors: string[];
-    abstract: string;
-    categories: string[];
-    submitted_date: string;
+  // Supabase types the joined relation as an array, but with !inner and limit(1)
+  // it is always a single object at runtime. Cast through unknown to satisfy TS.
+  type EntryRow = {
     llm_score: number;
-    keyword_score: number;
+    date: string;
+    papers: {
+      arxiv_id: string;
+      title: string;
+      authors: string[] | null;
+      abstract: string | null;
+      categories: string[] | null;
+      published_at: string | null;
+    };
   };
+  const entry = data[0] as unknown as EntryRow;
+
+  const p = entry.papers;
 
   return {
-    arxivId: row.arxiv_id,
-    title: row.title,
-    authors: row.authors ?? [],
-    abstract: row.abstract ?? '',
-    categories: row.categories ?? [],
-    submittedDate: row.submitted_date,
-    llmScore: Number(row.llm_score),
-    keywordScore: Number(row.keyword_score),
+    arxivId: p.arxiv_id,
+    title: p.title,
+    authors: p.authors ?? [],
+    abstract: p.abstract ?? '',
+    categories: p.categories ?? [],
+    submittedDate: p.published_at ?? entry.date,
+    llmScore: Number(entry.llm_score),
+    keywordScore: 0, // keyword_score is not stored in the current schema
   };
 }
 
@@ -70,7 +91,7 @@ export async function getPaperOfTheDay(): Promise<PaperOfTheDay | null> {
 
 /**
  * One entry in the paper-of-the-day history.
- * `date` is the paper's `submitted_date` (YYYY-MM-DD).
+ * `date` is the digest date (YYYY-MM-DD) from paper_digest_entries.
  */
 export interface DailyPaperEntry {
   date: string;
@@ -82,7 +103,7 @@ export interface DailyPaperEntry {
  * have at least one scored paper.  Results are sorted newest-first.
  *
  * Strategy:
- *   1. Query papers from `sinceDate` ordered by (submitted_date DESC, llm_score DESC).
+ *   1. Query paper_digest_entries from `sinceDate` ordered by (date DESC, llm_score DESC).
  *   2. Pick the first paper seen per date in JavaScript — avoids a complex SQL
  *      GROUP BY that Supabase's PostgREST doesn't easily support.
  *   3. Cap at `days` distinct dates.
@@ -99,13 +120,13 @@ export async function getDailyPaperHistory(days: number = 30): Promise<DailyPape
     .slice(0, 10);
 
   const { data, error } = await supabase
-    .from('papers')
+    .from('paper_digest_entries')
     .select(
-      'arxiv_id, title, authors, abstract, categories, submitted_date, llm_score, keyword_score',
+      'llm_score, date, papers!inner(arxiv_id, title, authors, abstract, categories, published_at)',
     )
-    .gte('submitted_date', sinceDate)
+    .gte('date', sinceDate)
     .not('llm_score', 'is', null)
-    .order('submitted_date', { ascending: false })
+    .order('date', { ascending: false })
     .order('llm_score', { ascending: false })
     .limit(safedays * 20);
 
@@ -119,30 +140,36 @@ export async function getDailyPaperHistory(days: number = 30): Promise<DailyPape
   const seen = new Set<string>();
   const entries: DailyPaperEntry[] = [];
 
-  for (const row of data as {
-    arxiv_id: string;
-    title: string;
-    authors: string[] | null;
-    abstract: string | null;
-    categories: string[] | null;
-    submitted_date: string;
+  // Supabase types the joined relation as array; cast through unknown.
+  type HistoryEntryRow = {
     llm_score: number | string;
-    keyword_score: number | string;
-  }[]) {
-    if (seen.has(row.submitted_date)) continue;
-    seen.add(row.submitted_date);
+    date: string;
+    papers: {
+      arxiv_id: string;
+      title: string;
+      authors: string[] | null;
+      abstract: string | null;
+      categories: string[] | null;
+      published_at: string | null;
+    };
+  };
 
+  for (const row of data as unknown as HistoryEntryRow[]) {
+    if (seen.has(row.date)) continue;
+    seen.add(row.date);
+
+    const p = row.papers;
     entries.push({
-      date: row.submitted_date,
+      date: row.date,
       paper: {
-        arxivId: row.arxiv_id,
-        title: row.title,
-        authors: row.authors ?? [],
-        abstract: row.abstract ?? '',
-        categories: row.categories ?? [],
-        submittedDate: row.submitted_date,
+        arxivId: p.arxiv_id,
+        title: p.title,
+        authors: p.authors ?? [],
+        abstract: p.abstract ?? '',
+        categories: p.categories ?? [],
+        submittedDate: p.published_at ?? row.date,
         llmScore: Number(row.llm_score),
-        keywordScore: Number(row.keyword_score),
+        keywordScore: 0,
       },
     });
 

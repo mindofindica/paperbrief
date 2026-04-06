@@ -97,55 +97,63 @@ async function fetchTodaysPapers(): Promise<{ papers: TodayPaper[]; generatedAt:
       return { papers, generatedAt: new Date().toISOString() };
     }
 
-    // Fallback: query papers table directly (last 24h by llm_score)
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Fallback: query paper_digest_entries (which has llm_score) joined with papers.
+    // papers.submitted_date does not exist — use papers.published_at.
+    // papers.llm_score does not exist — use paper_digest_entries.llm_score.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const { data: fallbackData, error: fallbackError } = await supabase
-      .from('papers')
-      .select('arxiv_id, title, abstract, authors, categories, submitted_date, llm_score')
-      .gte('ingested_at', yesterday)
+      .from('paper_digest_entries')
+      .select('llm_score, papers!inner(arxiv_id, title, abstract, authors, categories, published_at)')
+      .gte('date', yesterday)
       .not('llm_score', 'is', null)
       .order('llm_score', { ascending: false })
       .limit(5);
 
     if (fallbackError || !fallbackData || fallbackData.length === 0) {
       // Second fallback: last 3 days
-      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const { data: fallback2 } = await supabase
-        .from('papers')
-        .select('arxiv_id, title, abstract, authors, categories, submitted_date, llm_score')
-        .gte('ingested_at', threeDaysAgo)
+        .from('paper_digest_entries')
+        .select('llm_score, papers!inner(arxiv_id, title, abstract, authors, categories, published_at)')
+        .gte('date', threeDaysAgo)
         .not('llm_score', 'is', null)
         .order('llm_score', { ascending: false })
         .limit(5);
 
-      const papers: TodayPaper[] = (fallback2 ?? []).map(
-        (row: Record<string, unknown>) => ({
-          arxiv_id: row.arxiv_id as string,
-          title: row.title as string,
-          abstract: (row.abstract as string | null) ?? null,
-          authors: (row.authors as string[]) ?? [],
-          categories: (row.categories as string[]) ?? [],
-          published_at: (row.submitted_date as string | null) ?? null,
-          avg_score: Number(row.llm_score),
-          appearances: 1,
-        }),
-      );
+      // Supabase types the join as array; cast through unknown to satisfy TS.
+      type DigestEntryRow = {
+        llm_score: number;
+        papers: { arxiv_id: string; title: string; abstract: string | null; authors: string[]; categories: string[]; published_at: string | null; };
+      };
+      const papers: TodayPaper[] = ((fallback2 ?? []) as unknown as DigestEntryRow[]).map((row) => ({
+        arxiv_id: row.papers.arxiv_id,
+        title: row.papers.title,
+        abstract: row.papers.abstract ?? null,
+        authors: row.papers.authors ?? [],
+        categories: row.papers.categories ?? [],
+        published_at: row.papers.published_at ?? null,
+        avg_score: Number(row.llm_score),
+        appearances: 1,
+      }));
 
       return { papers, generatedAt: new Date().toISOString() };
     }
 
-    const papers: TodayPaper[] = fallbackData.map(
-      (row: Record<string, unknown>) => ({
-        arxiv_id: row.arxiv_id as string,
-        title: row.title as string,
-        abstract: (row.abstract as string | null) ?? null,
-        authors: (row.authors as string[]) ?? [],
-        categories: (row.categories as string[]) ?? [],
-        published_at: (row.submitted_date as string | null) ?? null,
-        avg_score: Number(row.llm_score),
-        appearances: 1,
-      }),
-    );
+    // Supabase types the join as array; cast through unknown to satisfy TS.
+    type DigestEntryRow = {
+      llm_score: number;
+      papers: { arxiv_id: string; title: string; abstract: string | null; authors: string[]; categories: string[]; published_at: string | null; };
+    };
+    const papers: TodayPaper[] = (fallbackData as unknown as DigestEntryRow[]).map((row) => ({
+      arxiv_id: row.papers.arxiv_id,
+      title: row.papers.title,
+      abstract: row.papers.abstract ?? null,
+      authors: row.papers.authors ?? [],
+      categories: row.papers.categories ?? [],
+      published_at: row.papers.published_at ?? null,
+      avg_score: Number(row.llm_score),
+      appearances: 1,
+    }));
 
     return { papers, generatedAt: new Date().toISOString() };
   } catch (err) {

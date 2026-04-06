@@ -1,5 +1,9 @@
 /**
  * Tests for today.ts — Paper of the Day data layer and helpers.
+ *
+ * Schema note: llm_score lives on paper_digest_entries, NOT papers.
+ * Papers has: arxiv_id, title, abstract, authors, categories, published_at, fetched_at
+ * paper_digest_entries has: date, arxiv_id, track, llm_score
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -48,16 +52,19 @@ function mockSupabase<T>(result: SupaResult<T>) {
 }
 
 // ── Sample data ───────────────────────────────────────────────────────────────
+// Matches the actual DB shape: paper_digest_entries row with nested papers join
 
-const SAMPLE_ROW = {
-  arxiv_id: '2401.00001',
-  title: 'Attention Is All You Need: Redux',
-  authors: ['Alice Smith', 'Bob Jones', 'Carol White', 'Dave Brown'],
-  abstract: 'We propose a new transformer architecture. ' + 'x'.repeat(300),
-  categories: ['cs.LG', 'cs.AI'],
-  submitted_date: '2024-01-15',
+const SAMPLE_ENTRY = {
   llm_score: 9.2,
-  keyword_score: 7.5,
+  date: '2024-01-15',
+  papers: {
+    arxiv_id: '2401.00001',
+    title: 'Attention Is All You Need: Redux',
+    authors: ['Alice Smith', 'Bob Jones', 'Carol White', 'Dave Brown'],
+    abstract: 'We propose a new transformer architecture. ' + 'x'.repeat(300),
+    categories: ['cs.LG', 'cs.AI'],
+    published_at: '2024-01-15',
+  },
 };
 
 const SAMPLE_PAPER: PaperOfTheDay = {
@@ -68,7 +75,7 @@ const SAMPLE_PAPER: PaperOfTheDay = {
   categories: ['cs.LG', 'cs.AI'],
   submittedDate: '2024-01-15',
   llmScore: 9.2,
-  keywordScore: 7.5,
+  keywordScore: 0,
 };
 
 // ── getPaperOfTheDay ──────────────────────────────────────────────────────────
@@ -79,25 +86,37 @@ describe('getPaperOfTheDay()', () => {
   });
 
   it('returns a PaperOfTheDay when supabase returns a paper', async () => {
-    mockSupabase({ data: [SAMPLE_ROW], error: null });
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
     const result = await getPaperOfTheDay();
     expect(result).not.toBeNull();
     expect(result?.arxivId).toBe('2401.00001');
     expect(result?.title).toBe('Attention Is All You Need: Redux');
     expect(result?.llmScore).toBe(9.2);
-    expect(result?.keywordScore).toBe(7.5);
   });
 
   it('maps authors array correctly', async () => {
-    mockSupabase({ data: [SAMPLE_ROW], error: null });
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
     const result = await getPaperOfTheDay();
     expect(result?.authors).toEqual(['Alice Smith', 'Bob Jones', 'Carol White', 'Dave Brown']);
   });
 
   it('maps categories array correctly', async () => {
-    mockSupabase({ data: [SAMPLE_ROW], error: null });
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
     const result = await getPaperOfTheDay();
     expect(result?.categories).toEqual(['cs.LG', 'cs.AI']);
+  });
+
+  it('uses published_at for submittedDate', async () => {
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
+    const result = await getPaperOfTheDay();
+    expect(result?.submittedDate).toBe('2024-01-15');
+  });
+
+  it('falls back to entry.date when published_at is null', async () => {
+    const entry = { ...SAMPLE_ENTRY, papers: { ...SAMPLE_ENTRY.papers, published_at: null } };
+    mockSupabase({ data: [entry], error: null });
+    const result = await getPaperOfTheDay();
+    expect(result?.submittedDate).toBe('2024-01-15'); // falls back to entry.date
   });
 
   it('returns null when no papers found in last 3 days', async () => {
@@ -119,22 +138,30 @@ describe('getPaperOfTheDay()', () => {
   });
 
   it('casts llm_score from string to number', async () => {
-    mockSupabase({ data: [{ ...SAMPLE_ROW, llm_score: '8.5' }], error: null });
+    mockSupabase({ data: [{ ...SAMPLE_ENTRY, llm_score: '8.5' }], error: null });
     const result = await getPaperOfTheDay();
     expect(result?.llmScore).toBe(8.5);
     expect(typeof result?.llmScore).toBe('number');
   });
 
   it('handles missing authors gracefully', async () => {
-    mockSupabase({ data: [{ ...SAMPLE_ROW, authors: null }], error: null });
+    const entry = { ...SAMPLE_ENTRY, papers: { ...SAMPLE_ENTRY.papers, authors: null } };
+    mockSupabase({ data: [entry], error: null });
     const result = await getPaperOfTheDay();
     expect(result?.authors).toEqual([]);
   });
 
   it('handles missing categories gracefully', async () => {
-    mockSupabase({ data: [{ ...SAMPLE_ROW, categories: null }], error: null });
+    const entry = { ...SAMPLE_ENTRY, papers: { ...SAMPLE_ENTRY.papers, categories: null } };
+    mockSupabase({ data: [entry], error: null });
     const result = await getPaperOfTheDay();
     expect(result?.categories).toEqual([]);
+  });
+
+  it('keywordScore is always 0 (not stored in current schema)', async () => {
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
+    const result = await getPaperOfTheDay();
+    expect(result?.keywordScore).toBe(0);
   });
 });
 
@@ -229,7 +256,7 @@ describe('GET /api/today', () => {
   });
 
   it('returns 200 with paper data when paper found', async () => {
-    mockSupabase({ data: [SAMPLE_ROW], error: null });
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
 
     // Dynamically import to pick up fresh mocks
     const { GET } = await import('../../app/api/today/route');
@@ -253,7 +280,7 @@ describe('GET /api/today', () => {
   });
 
   it('returns Cache-Control header', async () => {
-    mockSupabase({ data: [SAMPLE_ROW], error: null });
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
 
     const { GET } = await import('../../app/api/today/route');
     const response = await GET();
@@ -266,7 +293,7 @@ describe('GET /api/today', () => {
 
 describe('OG image', () => {
   it('renders without throwing when paper is returned', async () => {
-    mockSupabase({ data: [SAMPLE_ROW], error: null });
+    mockSupabase({ data: [SAMPLE_ENTRY], error: null });
 
     // Dynamically import to pick up fresh mocks
     const { default: Image } = await import('../../app/today/opengraph-image');
