@@ -1,14 +1,15 @@
 'use client';
 
 /**
- * TrendingTodayClient — interactive UI for /trending/today
+ * TrendingTodayClient — interactive UI for /trending/today and /trending/today/[date]
  *
  * Features:
- * - Top 5 papers with score bars (visual 1-10 scale)
+ * - Top 5–10 papers with score bars (visual 1-10 scale)
  * - Abstract expand/collapse per paper
  * - Twitter share button (pre-filled with good tweet text)
  * - "Get personalised digest" CTA
  * - Relative timestamp ("Updated X minutes ago")
+ * - Archive mode: when archiveDate is passed, shows the date-specific heading
  */
 
 import { useState } from 'react';
@@ -187,20 +188,33 @@ function PaperCard({ paper, rank }: { paper: TodayPaper; rank: number }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+/** Format YYYY-MM-DD → "Apr 7" */
+function shortDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
 export default function TrendingTodayClient({
   papers,
   generatedAt,
+  archiveDate,
 }: {
   papers: TodayPaper[];
   generatedAt: string;
+  /** If set, renders archive-mode header (e.g. "Apr 7") instead of "Top 5 Today" */
+  archiveDate?: string;
 }) {
   const siteUrl =
     typeof window !== 'undefined'
       ? window.location.origin
       : 'https://paperbrief.ai';
 
+  const isArchive = Boolean(archiveDate);
+  const pageUrl = archiveDate
+    ? `${siteUrl}/trending/today/${archiveDate}`
+    : `${siteUrl}/trending/today`;
   const tweetText = buildTweetText(papers);
-  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(`${siteUrl}/trending/today`)}`;
+  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(pageUrl)}`;
 
   return (
     <>
@@ -209,16 +223,21 @@ export default function TrendingTodayClient({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-2xl">⚡</span>
-              <h1 className="text-2xl font-bold text-gray-100">Top 5 Today</h1>
+              <span className="text-2xl">{isArchive ? '📅' : '⚡'}</span>
+              <h1 className="text-2xl font-bold text-gray-100">
+                {isArchive ? `Top Papers — ${shortDate(archiveDate!)}` : 'Top 5 Today'}
+              </h1>
             </div>
             <p className="text-gray-500 text-sm">
-              The highest-scoring arXiv ML papers from the last 24 hours,
-              ranked by LLM relevance across PaperBrief researcher digests.
+              {isArchive
+                ? `The highest-scoring arXiv ML papers from ${shortDate(archiveDate!)}, ranked by LLM relevance.`
+                : 'The highest-scoring arXiv ML papers from the last 24 hours, ranked by LLM relevance across PaperBrief researcher digests.'}
             </p>
-            <p className="text-gray-600 text-xs mt-1">
-              Updated {relativeTime(generatedAt)} · refreshes hourly
-            </p>
+            {!isArchive && (
+              <p className="text-gray-600 text-xs mt-1">
+                Updated {relativeTime(generatedAt)} · refreshes hourly
+              </p>
+            )}
           </div>
 
           {/* Share button */}
@@ -279,14 +298,16 @@ export default function TrendingTodayClient({
       )}
 
       {/* ── Nav to /trending ── */}
-      <div className="mt-6 text-center">
-        <Link
-          href="/trending"
-          className="text-sm text-gray-600 hover:text-gray-400 transition-colors"
-        >
-          ← See all trending papers this week
-        </Link>
-      </div>
+      {!isArchive && (
+        <div className="mt-6 text-center">
+          <Link
+            href="/trending"
+            className="text-sm text-gray-600 hover:text-gray-400 transition-colors"
+          >
+            ← See all trending papers this week
+          </Link>
+        </div>
+      )}
     </>
   );
 }

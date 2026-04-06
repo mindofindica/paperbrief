@@ -3,6 +3,7 @@ import { getSitemapPapers, getSitemapAuthors } from '../lib/arxiv-db';
 import { getDailyDigestDates } from '../lib/daily-digest';
 import { getAllTopics } from '../lib/topics';
 import { authorNameToSlug } from '../lib/author-pages';
+import { getAvailableArchiveDates } from '../lib/trending-archive';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://paperbrief.ai';
 
@@ -153,5 +154,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return [...STATIC_ROUTES, ...topicRoutes, ...rssRoutes, ...dailyRoutes, ...paperRoutes, ...authorRoutes];
+  // /trending/today/[date] archive pages — last 90 days
+  let trendingArchiveRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const archiveDates = await getAvailableArchiveDates(90);
+    const today = new Date().toISOString().slice(0, 10);
+    trendingArchiveRoutes = archiveDates
+      .filter(({ date }) => date !== today) // today is already covered by /trending/today
+      .map(({ date }) => ({
+        url: `${SITE_URL}/trending/today/${date}`,
+        lastModified: new Date(date + 'T12:00:00Z'),
+        changeFrequency: 'never' as const, // past days don't change
+        priority: 0.7,
+      }));
+  } catch {
+    trendingArchiveRoutes = [];
+  }
+
+  return [...STATIC_ROUTES, ...topicRoutes, ...rssRoutes, ...trendingArchiveRoutes, ...dailyRoutes, ...paperRoutes, ...authorRoutes];
 }
